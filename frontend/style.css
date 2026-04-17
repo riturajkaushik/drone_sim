@@ -1,0 +1,201 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  overflow: hidden;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: #111;
+}
+
+#canvas-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+}
+
+#canvas-container canvas {
+  display: block;
+}
+
+#control-panel {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  width: 280px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  background: rgba(20, 20, 30, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  color: #e0e0e0;
+  font-size: 13px;
+  z-index: 100;
+}
+
+#control-panel h2 {
+  font-size: 16px;
+  margin-bottom: 12px;
+  color: #fff;
+}
+
+#control-panel h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+  margin-bottom: 8px;
+}
+
+.panel-section {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.panel-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.input-row label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #aaa;
+  flex: 1;
+}
+
+.input-row input[type="number"] {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font-size: 13px;
+  outline: none;
+}
+
+.input-row input[type="number"]:focus {
+  border-color: #4a9eff;
+}
+
+.input-row input[type="range"] {
+  flex: 1;
+  accent-color: #4a9eff;
+}
+
+#speed-value {
+  min-width: 50px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+button {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 6px;
+  background: #4a9eff;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+button:hover {
+  background: #3a8eef;
+}
+
+button:active {
+  background: #2a7edf;
+}
+
+.button-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.button-row button {
+  flex: 1;
+  font-size: 12px;
+  padding: 5px 8px;
+}
+
+#clear-wp-btn {
+  background: #555;
+}
+
+#clear-wp-btn:hover {
+  background: #666;
+}
+
+#fly-wp-btn {
+  background: #22aa44;
+}
+
+#fly-wp-btn:hover {
+  background: #1c9c3a;
+}
+
+#waypoint-list {
+  list-style: none;
+  max-height: 120px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+
+#waypoint-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  margin-bottom: 3px;
+}
+
+#waypoint-list li .wp-remove {
+  cursor: pointer;
+  color: #f55;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+#status-display {
+  font-size: 12px;
+  line-height: 1.8;
+  font-variant-numeric: tabular-nums;
+}
+
+#status-display span {
+  color: #4a9eff;
+  font-weight: 500;
+}
+
+#ws-status {
+  font-size: 12px;
+  color: #f55;
+  font-weight: 500;
+}
+
+#ws-status.connected {
+  color: #22aa44;
+}
