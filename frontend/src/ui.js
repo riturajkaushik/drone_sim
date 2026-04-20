@@ -19,6 +19,10 @@ export class UI {
     this.droneError = document.getElementById('drone-error');
     this.droneList = document.getElementById('drone-list');
 
+    // Drone Scale
+    this.droneScaleSlider = document.getElementById('drone-scale-slider');
+    this.droneScaleValue = document.getElementById('drone-scale-value');
+
     // Fly To
     this.flyDroneSelect = document.getElementById('fly-drone-select');
     this.flyLatInput = document.getElementById('fly-lat');
@@ -53,6 +57,13 @@ export class UI {
       const x = parseFloat(this.captureXInput.value) || 0;
       const y = parseFloat(this.captureYInput.value) || 0;
       this.manager.setCaptureArea(x, y);
+    });
+
+    // Drone scale
+    this.droneScaleSlider.addEventListener('input', () => {
+      const percent = parseInt(this.droneScaleSlider.value, 10);
+      this.droneScaleValue.textContent = `${percent}%`;
+      this.manager.setScale(percent);
     });
 
     // Add drone

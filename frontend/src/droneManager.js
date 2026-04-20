@@ -11,6 +11,7 @@ export class DroneManager {
     this._nextId = 1;
     this._captureWidthMeters = 0;
     this._captureHeightMeters = 0;
+    this._scalePercent = 100;
   }
 
   /**
@@ -28,6 +29,11 @@ export class DroneManager {
     // Apply current capture area setting
     if (this._captureWidthMeters > 0 && this._captureHeightMeters > 0) {
       drone.setCaptureArea(this._captureWidthMeters, this._captureHeightMeters);
+    }
+
+    // Apply current scale
+    if (this._scalePercent !== 100) {
+      drone.setScale(this._scalePercent);
     }
 
     this.drones.set(id, drone);
@@ -58,6 +64,16 @@ export class DroneManager {
     this._captureHeightMeters = heightMeters;
     for (const drone of this.drones.values()) {
       drone.setCaptureArea(widthMeters, heightMeters);
+    }
+  }
+
+  /**
+   * Set scale percentage for all drones.
+   */
+  setScale(percent) {
+    this._scalePercent = percent;
+    for (const drone of this.drones.values()) {
+      drone.setScale(percent);
     }
   }
 

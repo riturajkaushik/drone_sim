@@ -28,12 +28,14 @@ export class Drone {
 
     // Create drone sprite
     const loader = new THREE.TextureLoader();
-    const texture = loader.load('/drone.webp');
+    const texture = loader.load('/drone.png');
     texture.colorSpace = THREE.SRGBColorSpace;
 
-    const material = new THREE.SpriteMaterial({ map: texture });
+    const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
     this.sprite = new THREE.Sprite(material);
-    this.sprite.scale.set(1.2, 1.2, 1);
+    this._baseScale = 1.2;
+    this._scalePercent = 100;
+    this.sprite.scale.set(this._baseScale, this._baseScale, 1);
 
     const pos = latLonToWorld(this.lat, this.lon);
     this.sprite.position.set(pos.x, pos.y, 1);
@@ -85,6 +87,15 @@ export class Drone {
       0,
     );
     this.scene.add(this._captureBox);
+  }
+
+  /**
+   * Scale the drone sprite by a percentage (100 = default size).
+   */
+  setScale(percent) {
+    this._scalePercent = Math.max(10, Math.min(500, percent));
+    const s = this._baseScale * (this._scalePercent / 100);
+    this.sprite.scale.set(s, s, 1);
   }
 
   setTarget(lat, lon) {
