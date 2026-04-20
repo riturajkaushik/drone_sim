@@ -11,11 +11,18 @@ from matplotlib.collections import PatchCollection
 class SpacePolygon:
     """A polygon defined by ordered GPS coordinates (lat/lon)."""
 
-    def __init__(self, coordinates: list[dict]):
+    def __init__(
+        self,
+        coordinates: list[dict],
+        entry_point: dict,
+        exit_point: dict,
+    ):
         """
         Args:
             coordinates: Ordered list of {"lat": float, "lon": float} dicts
                          defining the polygon vertices in traversal order.
+            entry_point: {"lat": float, "lon": float} where the drone enters.
+            exit_point:  {"lat": float, "lon": float} where the drone exits.
 
         Raises:
             ValueError: If fewer than 3 coordinates or missing keys.
@@ -29,7 +36,13 @@ class SpacePolygon:
                     f"Coordinate at index {i} missing 'lat' or 'lon' key."
                 )
 
+        for name, pt in [("entry_point", entry_point), ("exit_point", exit_point)]:
+            if "lat" not in pt or "lon" not in pt:
+                raise ValueError(f"{name} missing 'lat' or 'lon' key.")
+
         self.coordinates = coordinates
+        self.entry_point = entry_point
+        self.exit_point = exit_point
         # Shapely uses (x, y) = (lon, lat) per GIS convention
         ring = [(c["lon"], c["lat"]) for c in coordinates]
         self._polygon = Polygon(ring)
@@ -94,6 +107,28 @@ class SpacePolygon:
                 linewidths=0.8,
                 label="Centers",
             )
+
+        # Render entry and exit points
+        ax.scatter(
+            [self.entry_point["lon"]],
+            [self.entry_point["lat"]],
+            color="blue",
+            marker="o",
+            s=70,
+            zorder=7,
+            label="Entry",
+        )
+        ax.scatter(
+            [self.exit_point["lon"]],
+            [self.exit_point["lat"]],
+            facecolors="none",
+            edgecolors="blue",
+            marker="o",
+            s=70,
+            zorder=7,
+            linewidths=1.5,
+            label="Exit",
+        )
 
         ax.set_xlabel("Longitude")
         ax.set_ylabel("Latitude")
