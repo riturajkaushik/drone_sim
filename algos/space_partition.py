@@ -1,6 +1,7 @@
+import copy
 import math
 
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, box, LineString, Point, MultiPoint
 from pyproj import Transformer
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
@@ -81,6 +82,19 @@ class SpacePolygon:
             # PatchCollection doesn't support label in legend, add a proxy
             ax.plot([], [], color="green", linewidth=1.5, label="Partitions")
 
+        # Render rectangle centers
+        if hasattr(self, "_centers") and self._centers:
+            ax.scatter(
+                [c["lon"] for c in self._centers],
+                [c["lat"] for c in self._centers],
+                color="red",
+                marker="x",
+                s=20,
+                zorder=6,
+                linewidths=0.8,
+                label="Centers",
+            )
+
         ax.set_xlabel("Longitude")
         ax.set_ylabel("Latitude")
         ax.set_title("SpacePolygon")
@@ -137,7 +151,127 @@ class SpacePolygon:
                 lon += stride_lon
             lat += stride_lat
 
-        self.partitions = partitions
+        self.partitions = self._adjust_partitions(partitions, delta_lat, delta_lon)
+
+        self._centers = [
+            {
+                "lat": sum(c["lat"] for c in p["corners"]) / 4.0,
+                "lon": sum(c["lon"] for c in p["corners"]) / 4.0,
+            }
+            for p in self.partitions
+        ]
+
+    def get_centers(self) -> list[dict]:
+        """Return a deep copy of the rectangle centers.
+
+        Each center is a {"lat": float, "lon": float} dict.
+        The returned list is independent of the internal state.
+        """
+        if not hasattr(self, "_centers"):
+            return []
+        return copy.deepcopy(self._centers)
+
+    # ------------------------------------------------------------------
+    # Partition adjustment helpers
+    # ------------------------------------------------------------------
+
+    def _adjust_partitions(
+        self, partitions: list[dict], delta_lat: float, delta_lon: float
+    ) -> list[dict]:
+        """Filter and adjust partitions so every rectangle's center is reachable.
+
+        1. Remove rectangles that don't intersect the polygon.
+        2. For rectangles whose center is outside the polygon, shift along the
+           axis of least movement to place the center on the polygon boundary.
+        """
+        boundary = self._polygon.boundary
+        adjusted: list[dict] = []
+
+        for part in partitions:
+            rect_poly = self._corners_to_polygon(part["corners"])
+
+            if not rect_poly.intersects(self._polygon):
+                continue
+
+            center = rect_poly.centroid
+            if self._polygon.contains(center):
+                adjusted.append(part)
+                continue
+
+            shifted = self._shift_to_boundary(part["corners"], center, boundary)
+            if shifted is not None:
+                adjusted.append({"corners": shifted})
+
+        return adjusted
+
+    @staticmethod
+    def _corners_to_polygon(corners: list[dict]) -> Polygon:
+        ring = [(c["lon"], c["lat"]) for c in corners]
+        return Polygon(ring)
+
+    def _shift_to_boundary(
+        self,
+        corners: list[dict],
+        center: Point,
+        boundary: LineString,
+    ) -> list[dict] | None:
+        """Shift a rectangle along the axis of least movement to place its
+        center on the polygon boundary. Returns new corners or None."""
+        cx, cy = center.x, center.y  # lon, lat
+
+        best_offset_lon = None
+        best_offset_lat = None
+
+        # Horizontal line (constant lat) — find boundary intersections
+        h_line = LineString([(cx - 1, cy), (cx + 1, cy)])
+        h_inter = boundary.intersection(h_line)
+        if not h_inter.is_empty:
+            pts = self._extract_points(h_inter)
+            if pts:
+                nearest = min(pts, key=lambda p: abs(p.x - cx))
+                best_offset_lon = nearest.x - cx
+
+        # Vertical line (constant lon) — find boundary intersections
+        v_line = LineString([(cx, cy - 1), (cx, cy + 1)])
+        v_inter = boundary.intersection(v_line)
+        if not v_inter.is_empty:
+            pts = self._extract_points(v_inter)
+            if pts:
+                nearest = min(pts, key=lambda p: abs(p.y - cy))
+                best_offset_lat = nearest.y - cy
+
+        if best_offset_lon is None and best_offset_lat is None:
+            return None
+
+        # Pick axis with least movement
+        if best_offset_lat is None:
+            d_lon, d_lat = best_offset_lon, 0.0
+        elif best_offset_lon is None:
+            d_lon, d_lat = 0.0, best_offset_lat
+        elif abs(best_offset_lon) <= abs(best_offset_lat):
+            d_lon, d_lat = best_offset_lon, 0.0
+        else:
+            d_lon, d_lat = 0.0, best_offset_lat
+
+        return [
+            {"lat": c["lat"] + d_lat, "lon": c["lon"] + d_lon} for c in corners
+        ]
+
+    @staticmethod
+    def _extract_points(geom) -> list[Point]:
+        """Extract Point objects from a geometry (Point, MultiPoint, etc.)."""
+        if geom.is_empty:
+            return []
+        if geom.geom_type == "Point":
+            return [geom]
+        if geom.geom_type == "MultiPoint":
+            return list(geom.geoms)
+        # GeometryCollection — extract only points
+        points = []
+        for g in getattr(geom, "geoms", []):
+            if g.geom_type == "Point":
+                points.append(g)
+        return points
 
     # ------------------------------------------------------------------
     # Helpers
