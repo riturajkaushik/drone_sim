@@ -49,6 +49,12 @@ class SpacePolygon:
             label="Vertices",
         )
 
+        # Render bounding box
+        bb = self.bounding_box()
+        bb_lons = [bb["min_lon"], bb["max_lon"], bb["max_lon"], bb["min_lon"], bb["min_lon"]]
+        bb_lats = [bb["min_lat"], bb["min_lat"], bb["max_lat"], bb["max_lat"], bb["min_lat"]]
+        ax.plot(bb_lons, bb_lats, color="tomato", linewidth=1.5, linestyle="--", label="Bounding Box")
+
         ax.set_xlabel("Longitude")
         ax.set_ylabel("Latitude")
         ax.set_title("SpacePolygon")
