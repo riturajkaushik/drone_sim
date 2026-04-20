@@ -90,25 +90,66 @@ export class Drone {
 
     if (widthMeters <= 0 || heightMeters <= 0) return;
 
-    const canvasSize = 256;
+    const S = 512;
     const canvas = document.createElement('canvas');
-    canvas.width = canvasSize;
-    canvas.height = canvasSize;
+    canvas.width = S;
+    canvas.height = S;
     const ctx = canvas.getContext('2d');
 
-    const margin = 8;
-    const radius = 14;
+    const color = '#' + this.color.toString(16).padStart(6, '0');
+    const m = 24;            // margin from edge
+    const bracketLen = 50;   // length of corner bracket arms
+    const lw = 16;           // line width
 
-    // Rounded-corner border only
-    const colorHex = '#' + this.color.toString(16).padStart(6, '0');
-    ctx.strokeStyle = colorHex;
-    ctx.lineWidth = 4;
-    ctx.globalAlpha = 0.8;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lw;
+    ctx.lineCap = 'square';
+    ctx.globalAlpha = 1.0;
+
+    // Corner brackets (L-shapes at each corner)
+    // Top-left
     ctx.beginPath();
-    ctx.roundRect(margin, margin, canvasSize - margin * 2, canvasSize - margin * 2, radius);
+    ctx.moveTo(m, m + bracketLen);
+    ctx.lineTo(m, m);
+    ctx.lineTo(m + bracketLen, m);
+    ctx.stroke();
+    // Top-right
+    ctx.beginPath();
+    ctx.moveTo(S - m - bracketLen, m);
+    ctx.lineTo(S - m, m);
+    ctx.lineTo(S - m, m + bracketLen);
+    ctx.stroke();
+    // Bottom-right
+    ctx.beginPath();
+    ctx.moveTo(S - m, S - m - bracketLen);
+    ctx.lineTo(S - m, S - m);
+    ctx.lineTo(S - m - bracketLen, S - m);
+    ctx.stroke();
+    // Bottom-left
+    ctx.beginPath();
+    ctx.moveTo(m + bracketLen, S - m);
+    ctx.lineTo(m, S - m);
+    ctx.lineTo(m, S - m - bracketLen);
+    ctx.stroke();
+
+    // Center crosshair
+    const cx = S / 2;
+    const cy = S / 2;
+    const chSize = 14;
+    ctx.lineWidth = 3;
+    ctx.globalAlpha = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(cx - chSize, cy);
+    ctx.lineTo(cx + chSize, cy);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - chSize);
+    ctx.lineTo(cx, cy + chSize);
     ctx.stroke();
 
     const texture = new THREE.CanvasTexture(canvas);
+    texture.magFilter = THREE.NearestFilter;
+    texture.minFilter = THREE.NearestFilter;
     const geometry = new THREE.PlaneGeometry(this._captureWidthWorld, this._captureHeightWorld);
     const material = new THREE.MeshBasicMaterial({
       map: texture,
