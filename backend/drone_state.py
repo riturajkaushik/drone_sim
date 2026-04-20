@@ -40,3 +40,34 @@ class SpawnDroneRequest(BaseModel):
 
 class SpawnDronesResponse(BaseModel):
     drones: list[dict]  # [{"drone_id": str, "spawn_loc": [lat, lon]}, ...]
+
+
+class FollowWaypointsRequest(BaseModel):
+    """Validates the payload for follow_waypoints messages.
+    waypoints: {drone_id: [[lat, lon], [lat, lon], ...], ...}
+    """
+    waypoints: dict[str, list[list[float]]]
+
+    @field_validator("waypoints")
+    @classmethod
+    def validate_waypoints(cls, v: dict[str, list[list[float]]]) -> dict[str, list[list[float]]]:
+        if not v:
+            raise ValueError("waypoints must contain at least one drone")
+        for drone_id, wp_list in v.items():
+            if not wp_list:
+                raise ValueError(f"Drone '{drone_id}' has an empty waypoint list")
+            for i, coord in enumerate(wp_list):
+                if len(coord) != 2:
+                    raise ValueError(
+                        f"Drone '{drone_id}', waypoint {i}: expected [lat, lon], got {coord}"
+                    )
+                lat, lon = coord
+                if not (LAT_MIN <= lat <= LAT_MAX):
+                    raise ValueError(
+                        f"Drone '{drone_id}', waypoint {i}: lat {lat} out of bounds [{LAT_MIN}, {LAT_MAX}]"
+                    )
+                if not (LON_MIN <= lon <= LON_MAX):
+                    raise ValueError(
+                        f"Drone '{drone_id}', waypoint {i}: lon {lon} out of bounds [{LON_MIN}, {LON_MAX}]"
+                    )
+        return v

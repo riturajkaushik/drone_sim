@@ -1,6 +1,6 @@
 from fastapi import WebSocket
 import json
-from drone_state import DroneState, Waypoint, SpawnDroneRequest
+from drone_state import DroneState, Waypoint, SpawnDroneRequest, FollowWaypointsRequest
 from pydantic import ValidationError
 
 
@@ -50,8 +50,38 @@ class DroneWSHandler:
         elif msg_type == "spawn_drones":
             await self._handle_spawn_drones(ws, message)
 
+        elif msg_type == "follow_waypoints":
+            await self._handle_follow_waypoints(ws, message)
+
         else:
             print(f"Unknown message type: {msg_type}")
+
+    async def _handle_follow_waypoints(self, ws: WebSocket, message: dict):
+        raw_waypoints = message.get("waypoints", {})
+        try:
+            req = FollowWaypointsRequest(waypoints=raw_waypoints)
+        except ValidationError as e:
+            await self._send_error(ws, f"Invalid follow_waypoints payload: {e.errors()}")
+            return
+
+        # Verify all drone IDs exist before sending any commands
+        missing = [did for did in req.waypoints if did not in self.drones]
+        if missing:
+            await self._send_error(ws, f"Unknown drone ID(s): {missing}")
+            return
+
+        # Fan out set_waypoints per drone
+        for drone_id, coord_list in req.waypoints.items():
+            waypoints_dicts = [{"lat": c[0], "lon": c[1]} for c in coord_list]
+            await self.set_waypoints(drone_id, waypoints_dicts)
+
+        await self._send_to(ws, {
+            "type": "follow_waypoints_response",
+            "drones": {
+                did: len(wps) for did, wps in req.waypoints.items()
+            },
+        })
+        print(f"follow_waypoints: dispatched waypoints to {list(req.waypoints.keys())}")
 
     async def _handle_spawn_drones(self, ws: WebSocket, message: dict):
         raw_drones = message.get("drones", [])

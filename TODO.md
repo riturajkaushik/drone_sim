@@ -7,3 +7,5 @@
     - Drone id exits already
     
     The api should return the drone id. The drone id shouild be createed if not provided. Otehrise use the provided one and return the same. Implement appropriate pydantic schemas.
+
+[ ] Implement the route called follow_waypoints which takes a list of lat lon and in the fronend end the drone to immnediately follow the waypoints. Example payload {<drone_id1>: [[lat, lon], [lat1, lon1], ....], <drone_id2>: ...}. Implemet appropriate pydanti schemas. Also write an exampe script in example dir called "waypoint_following.py" where youy first spawn two drones and set twoi different lsists of waypoints to them.
