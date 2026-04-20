@@ -15,6 +15,7 @@ def main():
         exit_point={"lat": (60.1620 + 60.1550) / 2, "lon": (24.9100 + 24.9000) / 2},
     )
     polygon.partition(length_x=100, length_y=100, overlap_percentage=20)
+    polygon.plan_route()
     polygon.render()
 
 

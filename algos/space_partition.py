@@ -130,6 +130,17 @@ class SpacePolygon:
             label="Exit",
         )
 
+        # Render planned route
+        if hasattr(self, "_route") and self._route:
+            ax.plot(
+                [p["lon"] for p in self._route],
+                [p["lat"] for p in self._route],
+                color="darkorange",
+                linewidth=0.8,
+                zorder=5,
+                label="Route",
+            )
+
         ax.set_xlabel("Longitude")
         ax.set_ylabel("Latitude")
         ax.set_title("SpacePolygon")
@@ -205,6 +216,105 @@ class SpacePolygon:
         if not hasattr(self, "_centers"):
             return []
         return copy.deepcopy(self._centers)
+
+    # ------------------------------------------------------------------
+    # Route planning (TSP)
+    # ------------------------------------------------------------------
+
+    def plan_route(self) -> list[dict]:
+        """Find a short route visiting all rectangle centers.
+
+        Uses nearest-neighbor heuristic followed by 2-opt local search.
+        The route starts at ``entry_point`` and ends at ``exit_point``.
+
+        Returns:
+            Ordered list of {"lat": float, "lon": float} from entry to exit.
+
+        Raises:
+            RuntimeError: If ``partition()`` has not been called yet.
+        """
+        if not hasattr(self, "_centers") or not self._centers:
+            raise RuntimeError("Call partition() before plan_route().")
+
+        nodes = (
+            [self.entry_point]
+            + list(copy.deepcopy(self._centers))
+            + [self.exit_point]
+        )
+        n = len(nodes)
+
+        # Pre-compute distance matrix
+        dist = [[0.0] * n for _ in range(n)]
+        for i in range(n):
+            for j in range(i + 1, n):
+                d = self._coord_dist(nodes[i], nodes[j])
+                dist[i][j] = d
+                dist[j][i] = d
+
+        # Nearest-neighbor starting from node 0 (entry), ending at node n-1 (exit)
+        route = self._nearest_neighbor(n, dist)
+
+        # 2-opt improvement (keep first and last fixed)
+        route = self._two_opt(route, dist)
+
+        self._route = [nodes[i] for i in route]
+        return copy.deepcopy(self._route)
+
+    def get_route(self) -> list[dict]:
+        """Return a deep copy of the planned route.
+
+        Each element is a {"lat": float, "lon": float} dict.
+        """
+        if not hasattr(self, "_route"):
+            return []
+        return copy.deepcopy(self._route)
+
+    @staticmethod
+    def _coord_dist(a: dict, b: dict) -> float:
+        """Euclidean distance between two lat/lon dicts (good enough for small areas)."""
+        dlat = a["lat"] - b["lat"]
+        dlon = a["lon"] - b["lon"]
+        return math.sqrt(dlat * dlat + dlon * dlon)
+
+    @staticmethod
+    def _nearest_neighbor(n: int, dist: list[list[float]]) -> list[int]:
+        """Nearest-neighbor heuristic with fixed start (0) and end (n-1)."""
+        visited = [False] * n
+        route = [0]
+        visited[0] = True
+        visited[n - 1] = True  # reserve exit for last
+
+        for _ in range(n - 2):
+            last = route[-1]
+            best_j = -1
+            best_d = float("inf")
+            for j in range(n):
+                if not visited[j] and dist[last][j] < best_d:
+                    best_d = dist[last][j]
+                    best_j = j
+            route.append(best_j)
+            visited[best_j] = True
+
+        route.append(n - 1)
+        return route
+
+    @staticmethod
+    def _two_opt(route: list[int], dist: list[list[float]]) -> list[int]:
+        """2-opt local search. Keeps route[0] and route[-1] fixed."""
+        n = len(route)
+        improved = True
+        while improved:
+            improved = False
+            for i in range(1, n - 2):
+                for j in range(i + 1, n - 1):
+                    # Cost of current edges: (i-1,i) + (j,j+1)
+                    # Cost after reversal:   (i-1,j) + (i,j+1)
+                    d_old = dist[route[i - 1]][route[i]] + dist[route[j]][route[j + 1]]
+                    d_new = dist[route[i - 1]][route[j]] + dist[route[i]][route[j + 1]]
+                    if d_new < d_old - 1e-12:
+                        route[i : j + 1] = route[i : j + 1][::-1]
+                        improved = True
+        return route
 
     # ------------------------------------------------------------------
     # Partition adjustment helpers
