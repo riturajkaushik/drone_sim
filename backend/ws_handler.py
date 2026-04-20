@@ -9,6 +9,7 @@ class DroneWSHandler:
         self.connections: list[WebSocket] = []
         self.drones: dict[str, DroneState] = {}
         self.surveillance_polygon: list[list[float]] | None = None
+        self.nav_corridors: dict[str, list[list[float]]] | None = None
         self._next_id = 1
 
     def _generate_drone_id(self) -> str:
@@ -64,6 +65,7 @@ class DroneWSHandler:
         drone_count = len(self.drones)
         self.drones.clear()
         self.surveillance_polygon = None
+        self.nav_corridors = None
         self._next_id = 1
 
         # Tell all frontends to reset

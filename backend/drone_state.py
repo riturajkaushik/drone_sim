@@ -64,6 +64,40 @@ class SurveillancePolygonRequest(BaseModel):
         return v
 
 
+class NavCorridorsRequest(BaseModel):
+    """Validates the payload for the POST /nav-corridors endpoint.
+    nav_corridors: {"corridor_0": [[lat, lon], ...], "corridor_1": [[lat, lon], ...], ...}
+    Each corridor is an ordered list of vertices forming a polygon (at least 3 vertices).
+    """
+    nav_corridors: dict[str, list[list[float]]]
+
+    @field_validator("nav_corridors")
+    @classmethod
+    def validate_nav_corridors(cls, v: dict[str, list[list[float]]]) -> dict[str, list[list[float]]]:
+        if not v:
+            raise ValueError("nav_corridors must contain at least one corridor")
+        for corridor_id, vertices in v.items():
+            if len(vertices) < 3:
+                raise ValueError(
+                    f"Corridor '{corridor_id}': requires at least 3 vertices, got {len(vertices)}"
+                )
+            for i, coord in enumerate(vertices):
+                if len(coord) != 2:
+                    raise ValueError(
+                        f"Corridor '{corridor_id}', vertex {i}: expected [lat, lon], got {coord}"
+                    )
+                lat, lon = coord
+                if not (LAT_MIN <= lat <= LAT_MAX):
+                    raise ValueError(
+                        f"Corridor '{corridor_id}', vertex {i}: lat {lat} out of bounds [{LAT_MIN}, {LAT_MAX}]"
+                    )
+                if not (LON_MIN <= lon <= LON_MAX):
+                    raise ValueError(
+                        f"Corridor '{corridor_id}', vertex {i}: lon {lon} out of bounds [{LON_MIN}, {LON_MAX}]"
+                    )
+        return v
+
+
 class FollowWaypointsRequest(BaseModel):
     """Validates the payload for follow_waypoints messages.
     waypoints: {drone_id: [[lat, lon], [lat, lon], ...], ...}

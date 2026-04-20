@@ -14,4 +14,6 @@
 
 [x] In frontend, implement a reset simulator button which will clear all the dorn and waypoints data - incluing ids, polygons everything. Implement the corresponiging api for backend. Finally use that clear api in the exampple scripts before spawning new dones. 
 
-[ ] Create a rest api end point in the backend to setup the Surveillance area polygon. Payload {"surveillance_polygon": [[lat, lon], ...]}. Write example script in the examples dir to create a surveillance area polygon. Then spawn a drone and follwo a set of random waypoints. Wriote enough comments to understand the script.
+[x] Create a rest api end point in the backend to setup the Surveillance area polygon. Payload {"surveillance_polygon": [[lat, lon], ...]}. Write example script in the examples dir to create a surveillance area polygon. Then spawn a drone and follwo a set of random waypoints. Wriote enough comments to understand the script.
+
+[x] Create rest api end point to create the nav corridors. The payload is a lost of polygons ["corridor_0": [[lat, lon], ...], "corridor_2": [[lat, lon], ...]]. Implement proper pydantic schema and implement example script. It should set a surveillance polygon, set two nav corridors to reach and exit the surveillance area and spawn one drop and follow a random waypoints list

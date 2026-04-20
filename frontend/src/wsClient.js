@@ -130,6 +130,22 @@ export class WSClient {
         break;
       }
 
+      case 'set_nav_corridors': {
+        const corridors = message.nav_corridors || {};
+        this.corridorManager.removeAll();
+        for (const [corridorId, vertices] of Object.entries(corridors)) {
+          const { overlay } = this.corridorManager.addCorridor();
+          for (const [lat, lon] of vertices) {
+            overlay.addVertex(lat, lon);
+          }
+          if (vertices.length >= 3) {
+            overlay.create();
+          }
+        }
+        console.log(`Nav corridors set: ${Object.keys(corridors).join(', ')}`);
+        break;
+      }
+
       default:
         console.warn('Unknown WS message type:', type);
     }

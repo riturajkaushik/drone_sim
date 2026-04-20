@@ -2,7 +2,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 import json
 from ws_handler import DroneWSHandler
-from drone_state import SurveillancePolygonRequest
+from drone_state import SurveillancePolygonRequest, NavCorridorsRequest
 
 app = FastAPI(title="Drone Simulation Backend")
 
@@ -44,6 +44,23 @@ async def set_surveillance_polygon(req: SurveillancePolygonRequest):
         "status": "ok",
         "vertices": len(req.surveillance_polygon),
         "surveillance_polygon": req.surveillance_polygon,
+    }
+
+
+@app.post("/nav-corridors")
+async def set_nav_corridors(req: NavCorridorsRequest):
+    """Store navigation corridors and broadcast them to all connected frontends."""
+    handler.nav_corridors = req.nav_corridors
+    await handler.send_to_all({
+        "type": "set_nav_corridors",
+        "nav_corridors": req.nav_corridors,
+    })
+    return {
+        "status": "ok",
+        "corridors": {
+            cid: len(verts) for cid, verts in req.nav_corridors.items()
+        },
+        "nav_corridors": req.nav_corridors,
     }
 
 
