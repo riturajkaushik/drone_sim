@@ -77,11 +77,11 @@ export class Drone {
   }
 
   setCaptureArea(widthMeters, heightMeters) {
-    // Remove old box if exists
     if (this._captureBox) {
       this.scene.remove(this._captureBox);
-      this._captureBox.geometry.dispose();
+      this._captureBox.material.map.dispose();
       this._captureBox.material.dispose();
+      this._captureBox.geometry.dispose();
       this._captureBox = null;
     }
 
@@ -90,29 +90,34 @@ export class Drone {
 
     if (widthMeters <= 0 || heightMeters <= 0) return;
 
-    const hw = this._captureWidthWorld / 2;
-    const hh = this._captureHeightWorld / 2;
+    const canvasSize = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvasSize;
+    canvas.height = canvasSize;
+    const ctx = canvas.getContext('2d');
 
-    const points = [
-      new THREE.Vector3(-hw, -hh, 1.5),
-      new THREE.Vector3( hw, -hh, 1.5),
-      new THREE.Vector3( hw,  hh, 1.5),
-      new THREE.Vector3(-hw,  hh, 1.5),
-    ];
+    const margin = 8;
+    const radius = 14;
 
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    const material = new THREE.LineBasicMaterial({
-      color: this.color,
-      linewidth: 1,
+    // Rounded-corner border only
+    const colorHex = '#' + this.color.toString(16).padStart(6, '0');
+    ctx.strokeStyle = colorHex;
+    ctx.lineWidth = 4;
+    ctx.globalAlpha = 0.8;
+    ctx.beginPath();
+    ctx.roundRect(margin, margin, canvasSize - margin * 2, canvasSize - margin * 2, radius);
+    ctx.stroke();
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const geometry = new THREE.PlaneGeometry(this._captureWidthWorld, this._captureHeightWorld);
+    const material = new THREE.MeshBasicMaterial({
+      map: texture,
       transparent: true,
-      opacity: 0.7,
+      depthWrite: false,
     });
-    this._captureBox = new THREE.LineLoop(geometry, material);
-    this._captureBox.position.set(
-      this.sprite.position.x,
-      this.sprite.position.y,
-      0,
-    );
+
+    this._captureBox = new THREE.Mesh(geometry, material);
+    this._captureBox.position.set(this.sprite.position.x, this.sprite.position.y, 0.5);
     this.scene.add(this._captureBox);
   }
 
@@ -221,7 +226,7 @@ export class Drone {
       this._captureBox.position.set(
         this.sprite.position.x,
         this.sprite.position.y,
-        0,
+        0.5,
       );
     }
     this._updateLabelPosition();
@@ -246,8 +251,9 @@ export class Drone {
 
     if (this._captureBox) {
       this.scene.remove(this._captureBox);
-      this._captureBox.geometry.dispose();
+      this._captureBox.material.map.dispose();
       this._captureBox.material.dispose();
+      this._captureBox.geometry.dispose();
     }
   }
 
