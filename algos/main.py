@@ -10,6 +10,7 @@ def main():
         {"lat": 60.1550, "lon": 24.9000},
         {"lat": 60.1560, "lon": 24.8750},
     ])
+    polygon.partition(length_x=100, length_y=100, overlap_percentage=20)
     polygon.render()
 
 

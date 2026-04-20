@@ -1,3 +1,5 @@
+import math
+
 from shapely.geometry import Polygon
 from pyproj import Transformer
 import matplotlib.pyplot as plt
@@ -55,6 +57,30 @@ class SpacePolygon:
         bb_lats = [bb["min_lat"], bb["min_lat"], bb["max_lat"], bb["max_lat"], bb["min_lat"]]
         ax.plot(bb_lons, bb_lats, color="tomato", linewidth=1.5, linestyle="--", label="Bounding Box")
 
+        # Render partitions if available
+        if hasattr(self, "partitions") and self.partitions:
+            rect_patches = []
+            for part in self.partitions:
+                corners = part["corners"]
+                lons_r = [c["lon"] for c in corners]
+                lats_r = [c["lat"] for c in corners]
+                rect = mpatches.Polygon(
+                    list(zip(lons_r, lats_r)),
+                    closed=True,
+                )
+                rect_patches.append(rect)
+            pc = PatchCollection(
+                rect_patches,
+                edgecolor="green",
+                facecolor="green",
+                alpha=0.15,
+                linewidth=0.8,
+                label="Partitions",
+            )
+            ax.add_collection(pc)
+            # PatchCollection doesn't support label in legend, add a proxy
+            ax.plot([], [], color="green", linewidth=1.5, label="Partitions")
+
         ax.set_xlabel("Longitude")
         ax.set_ylabel("Latitude")
         ax.set_title("SpacePolygon")
@@ -63,21 +89,79 @@ class SpacePolygon:
         plt.tight_layout()
         plt.show()
 
+    def partition(
+        self,
+        length_x: float,
+        length_y: float,
+        overlap_percentage: float = 20.0,
+    ) -> None:
+        """Partition the bounding box into overlapping rectangles.
+
+        The rectangles are sized length_x × length_y (in meters) and placed so
+        that every part of the bounding box is covered.  When an integer number
+        of rectangles doesn't fit exactly, the last column/row overflows beyond
+        the bounding box boundary.
+
+        Args:
+            length_x: Rectangle width in meters (longitude direction).
+            length_y: Rectangle height in meters (latitude direction).
+            overlap_percentage: Percentage overlap between adjacent rectangles
+                                in each dimension (0–100). Default 20%.
+        """
+        bb = self.bounding_box()
+
+        # Convert meter dimensions to degree offsets
+        METERS_PER_DEG_LAT = 111_320.0
+        center_lat = (bb["min_lat"] + bb["max_lat"]) / 2.0
+        meters_per_deg_lon = METERS_PER_DEG_LAT * math.cos(math.radians(center_lat))
+
+        delta_lat = length_y / METERS_PER_DEG_LAT
+        delta_lon = length_x / meters_per_deg_lon
+
+        overlap_frac = overlap_percentage / 100.0
+        stride_lat = delta_lat * (1.0 - overlap_frac)
+        stride_lon = delta_lon * (1.0 - overlap_frac)
+
+        partitions: list[dict] = []
+        lat = bb["min_lat"]
+        while lat < bb["max_lat"]:
+            lon = bb["min_lon"]
+            while lon < bb["max_lon"]:
+                corners = [
+                    {"lat": lat, "lon": lon},
+                    {"lat": lat, "lon": lon + delta_lon},
+                    {"lat": lat + delta_lat, "lon": lon + delta_lon},
+                    {"lat": lat + delta_lat, "lon": lon},
+                ]
+                partitions.append({"corners": corners})
+                lon += stride_lon
+            lat += stride_lat
+
+        self.partitions = partitions
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _get_utm_transformers(self):
+        """Return (to_utm, to_wgs, utm_crs) transformers for this polygon."""
+        centroid = self._polygon.centroid
+        centroid_lon, centroid_lat = centroid.x, centroid.y
+        utm_zone = int((centroid_lon + 180) / 6) + 1
+        hemisphere = "north" if centroid_lat >= 0 else "south"
+        utm_crs = f"+proj=utm +zone={utm_zone} +{hemisphere} +datum=WGS84"
+
+        to_utm = Transformer.from_crs("EPSG:4326", utm_crs, always_xy=True)
+        to_wgs = Transformer.from_crs(utm_crs, "EPSG:4326", always_xy=True)
+        return to_utm, to_wgs, utm_crs
+
     def area(self) -> float:
         """Calculate the polygon area in square meters using UTM projection.
 
         Returns:
             Area in square meters.
         """
-        centroid = self._polygon.centroid
-        centroid_lon, centroid_lat = centroid.x, centroid.y
-
-        # Determine UTM zone from centroid longitude
-        utm_zone = int((centroid_lon + 180) / 6) + 1
-        hemisphere = "north" if centroid_lat >= 0 else "south"
-        utm_crs = f"+proj=utm +zone={utm_zone} +{hemisphere} +datum=WGS84"
-
-        transformer = Transformer.from_crs("EPSG:4326", utm_crs, always_xy=True)
+        transformer, _, _ = self._get_utm_transformers()
         projected_coords = [
             transformer.transform(c["lon"], c["lat"]) for c in self.coordinates
         ]
