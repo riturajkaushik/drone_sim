@@ -16,14 +16,23 @@ export class DroneManager {
 
   /**
    * Add a new drone at the given position.
+   * @param {number} lat
+   * @param {number} lon
+   * @param {string|null} id - Optional explicit ID. Auto-generated if null.
    * @returns {{ drone: Drone } | { error: string }}
    */
-  addDrone(lat, lon) {
+  addDrone(lat, lon, id = null) {
     if (!isInBounds(lat, lon)) {
       return { error: `Coordinates (${lat.toFixed(4)}, ${lon.toFixed(4)}) are outside the visible map area.` };
     }
 
-    const id = `drone-${this._nextId++}`;
+    if (id && this.drones.has(id)) {
+      return { error: `Drone ID '${id}' already exists.` };
+    }
+
+    if (!id) {
+      id = `drone-${this._nextId++}`;
+    }
     const drone = new Drone(this.scene, id, lat, lon);
 
     // Apply current capture area setting

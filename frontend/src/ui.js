@@ -270,6 +270,12 @@ export class UI {
     }
   }
 
+  /** Public method to refresh drone list and selects (e.g. after WS spawn). */
+  refreshDroneList() {
+    this._renderDroneList();
+    this._updateDroneSelects();
+  }
+
   _updateDroneSelects() {
     const drones = this.manager.getAllDrones();
     for (const select of [this.flyDroneSelect, this.wpDroneSelect]) {

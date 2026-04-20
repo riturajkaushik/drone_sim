@@ -1,12 +1,21 @@
 from fastapi import WebSocket
 import json
-from drone_state import DroneState, Waypoint
+from drone_state import DroneState, Waypoint, SpawnDroneRequest
+from pydantic import ValidationError
 
 
 class DroneWSHandler:
     def __init__(self):
         self.connections: list[WebSocket] = []
-        self.drone_state = DroneState()
+        self.drones: dict[str, DroneState] = {}
+        self._next_id = 1
+
+    def _generate_drone_id(self) -> str:
+        while True:
+            drone_id = f"drone-{self._next_id}"
+            self._next_id += 1
+            if drone_id not in self.drones:
+                return drone_id
 
     def register(self, ws: WebSocket):
         self.connections.append(ws)
@@ -21,20 +30,109 @@ class DroneWSHandler:
         msg_type = message.get("type")
 
         if msg_type == "status_response":
-            self.drone_state.lat = message.get("lat", self.drone_state.lat)
-            self.drone_state.lon = message.get("lon", self.drone_state.lon)
-            self.drone_state.speed = message.get("speed", self.drone_state.speed)
-            self.drone_state.is_flying = message.get("is_flying", self.drone_state.is_flying)
-            print(f"Drone status: ({self.drone_state.lat:.4f}, {self.drone_state.lon:.4f}) "
-                  f"speed={self.drone_state.speed} flying={self.drone_state.is_flying}")
+            drones_data = message.get("drones", [])
+            for d in drones_data:
+                drone_id = d.get("id")
+                if drone_id and drone_id in self.drones:
+                    state = self.drones[drone_id]
+                    state.lat = d.get("lat", state.lat)
+                    state.lon = d.get("lon", state.lon)
+                    state.speed = d.get("speed", state.speed)
+                    state.is_flying = d.get("is_flying", state.is_flying)
+            print(f"Status update for {len(drones_data)} drone(s)")
 
         elif msg_type == "waypoint_reached":
+            drone_id = message.get("drone_id", "unknown")
             wp = message.get("waypoint", {})
             idx = message.get("index", -1)
-            print(f"Drone reached waypoint #{idx}: ({wp.get('lat')}, {wp.get('lon')})")
+            print(f"Drone {drone_id} reached waypoint #{idx}: ({wp.get('lat')}, {wp.get('lon')})")
+
+        elif msg_type == "spawn_drones":
+            await self._handle_spawn_drones(ws, message)
 
         else:
             print(f"Unknown message type: {msg_type}")
+
+    async def _handle_spawn_drones(self, ws: WebSocket, message: dict):
+        raw_drones = message.get("drones", [])
+        if not raw_drones:
+            await self._send_error(ws, "No drones provided in spawn request.")
+            return
+
+        # Validate each request via Pydantic
+        requests: list[SpawnDroneRequest] = []
+        for i, raw in enumerate(raw_drones):
+            try:
+                requests.append(SpawnDroneRequest(**raw))
+            except ValidationError as e:
+                await self._send_error(ws, f"Invalid drone at index {i}: {e.errors()}")
+                return
+
+        # Collect IDs — assign where missing, check duplicates
+        assigned: list[tuple[str, list[float]]] = []
+        new_ids: set[str] = set()
+
+        for req in requests:
+            drone_id = req.drone_id or self._generate_drone_id()
+
+            if drone_id in self.drones:
+                await self._send_error(ws, f"Drone ID '{drone_id}' already exists.")
+                return
+            if drone_id in new_ids:
+                await self._send_error(ws, f"Duplicate drone ID '{drone_id}' in request.")
+                return
+
+            new_ids.add(drone_id)
+            assigned.append((drone_id, req.spawn_loc))
+
+        # Check location uniqueness against existing drones and within request
+        all_locations: list[tuple[float, float]] = [
+            (s.lat, s.lon) for s in self.drones.values()
+        ]
+        for drone_id, spawn_loc in assigned:
+            loc_tuple = (spawn_loc[0], spawn_loc[1])
+            if loc_tuple in all_locations:
+                await self._send_error(
+                    ws,
+                    f"Spawn location ({spawn_loc[0]}, {spawn_loc[1]}) is already occupied.",
+                )
+                return
+            all_locations.append(loc_tuple)
+
+        # All checks passed — register drones
+        response_drones = []
+        for drone_id, spawn_loc in assigned:
+            self.drones[drone_id] = DroneState(
+                id=drone_id, lat=spawn_loc[0], lon=spawn_loc[1]
+            )
+            response_drones.append({
+                "drone_id": drone_id,
+                "spawn_loc": spawn_loc,
+            })
+
+        # Broadcast to all frontends so they create the drone sprites
+        await self.send_to_all({
+            "type": "spawn_drones",
+            "drones": response_drones,
+        })
+
+        # Send confirmation back to the requester
+        await self._send_to(ws, {
+            "type": "spawn_drones_response",
+            "drones": response_drones,
+        })
+
+        print(f"Spawned {len(response_drones)} drone(s): "
+              f"{[d['drone_id'] for d in response_drones]}")
+
+    async def _send_error(self, ws: WebSocket, error_msg: str):
+        await self._send_to(ws, {"type": "error", "message": error_msg})
+
+    async def _send_to(self, ws: WebSocket, message: dict):
+        try:
+            await ws.send_text(json.dumps(message))
+        except Exception:
+            self.unregister(ws)
 
     async def send_to_all(self, message: dict):
         """Send a message to all connected clients."""
@@ -48,19 +146,23 @@ class DroneWSHandler:
         for ws in disconnected:
             self.unregister(ws)
 
-    async def set_waypoints(self, waypoints: list[dict]):
-        """Command the drone to fly to a sequence of waypoints."""
-        self.drone_state.waypoints = [Waypoint(**wp) for wp in waypoints]
+    async def set_waypoints(self, drone_id: str, waypoints: list[dict]):
+        """Command a drone to fly to a sequence of waypoints."""
+        if drone_id in self.drones:
+            self.drones[drone_id].waypoints = [Waypoint(**wp) for wp in waypoints]
         await self.send_to_all({
             "type": "set_waypoints",
+            "drone_id": drone_id,
             "waypoints": waypoints,
         })
 
-    async def set_velocity(self, speed: float):
-        """Command the drone to change speed."""
-        self.drone_state.speed = speed
+    async def set_velocity(self, drone_id: str, speed: float):
+        """Command a drone to change speed."""
+        if drone_id in self.drones:
+            self.drones[drone_id].speed = speed
         await self.send_to_all({
             "type": "set_velocity",
+            "drone_id": drone_id,
             "speed": speed,
         })
 

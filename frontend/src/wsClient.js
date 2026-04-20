@@ -85,6 +85,27 @@ export class WSClient {
         break;
       }
 
+      case 'spawn_drones': {
+        const drones = message.drones || [];
+        for (const d of drones) {
+          const [lat, lon] = d.spawn_loc;
+          // Skip if this drone already exists locally (e.g. we sent the command)
+          if (this.manager.getDrone(d.drone_id)) continue;
+          const result = this.manager.addDrone(lat, lon, d.drone_id);
+          if (result.error) {
+            console.warn(`Failed to spawn drone ${d.drone_id}:`, result.error);
+          } else {
+            // Wire waypoint callback to send over WS
+            const droneId = d.drone_id;
+            result.drone.onWaypointReached = (wp, idx) => {
+              this.sendWaypointReached(droneId, wp, idx);
+            };
+          }
+        }
+        this.ui.refreshDroneList();
+        break;
+      }
+
       default:
         console.warn('Unknown WS message type:', type);
     }
