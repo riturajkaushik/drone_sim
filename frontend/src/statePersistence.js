@@ -3,7 +3,7 @@ const STORAGE_KEY = 'drone_sim_state';
 /**
  * Save the full application state to localStorage.
  */
-export function saveState(manager, ui) {
+export function saveState(manager, ui, polygonOverlay) {
   const state = {
     drones: manager.getAllDrones().map(d => ({
       id: d.id,
@@ -19,6 +19,10 @@ export function saveState(manager, ui) {
     speedSlider: parseInt(ui.speedSlider.value, 10),
     waypointQueues: Object.fromEntries(ui.waypointQueues),
     nextId: manager._nextId,
+    polygon: {
+      vertices: polygonOverlay.getVertices(),
+      created: polygonOverlay.isCreated(),
+    },
   };
 
   try {
@@ -33,7 +37,7 @@ export function saveState(manager, ui) {
  * Recreates drones and applies settings.
  * @returns {boolean} true if state was restored
  */
-export function restoreState(manager, ui) {
+export function restoreState(manager, ui, polygonOverlay) {
   let raw;
   try {
     raw = localStorage.getItem(STORAGE_KEY);
@@ -96,6 +100,18 @@ export function restoreState(manager, ui) {
       }
     }
     ui._renderWaypointList();
+  }
+
+  // Restore polygon
+  if (state.polygon && state.polygon.vertices && state.polygon.vertices.length > 0) {
+    for (const v of state.polygon.vertices) {
+      polygonOverlay.addVertex(v.lat, v.lon);
+    }
+    if (state.polygon.created) {
+      polygonOverlay.create();
+    }
+    ui._renderPolygonPointList();
+    ui._updatePolyButtons();
   }
 
   return true;

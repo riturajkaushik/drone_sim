@@ -3,8 +3,9 @@
  * Works standalone without backend.
  */
 export class UI {
-  constructor(manager) {
+  constructor(manager, polygonOverlay) {
     this.manager = manager;
+    this.polygonOverlay = polygonOverlay;
     this.waypointQueues = new Map(); // droneId → [{lat, lon}, ...]
 
     // Capture Area
@@ -41,6 +42,14 @@ export class UI {
     this.clearWpBtn = document.getElementById('clear-wp-btn');
     this.flyWpBtn = document.getElementById('fly-wp-btn');
     this.waypointList = document.getElementById('waypoint-list');
+
+    // Polygon
+    this.polyLatInput = document.getElementById('poly-lat');
+    this.polyLonInput = document.getElementById('poly-lon');
+    this.addPolyPointBtn = document.getElementById('add-poly-point-btn');
+    this.createPolyBtn = document.getElementById('create-poly-btn');
+    this.removePolyBtn = document.getElementById('remove-poly-btn');
+    this.polygonPointList = document.getElementById('polygon-point-list');
 
     // Status
     this.statusDisplay = document.getElementById('status-display');
@@ -143,6 +152,30 @@ export class UI {
     this.wpDroneSelect.addEventListener('change', () => {
       this._renderWaypointList();
     });
+
+    // Polygon: add point
+    this.addPolyPointBtn.addEventListener('click', () => {
+      const lat = parseFloat(this.polyLatInput.value);
+      const lon = parseFloat(this.polyLonInput.value);
+      if (!isNaN(lat) && !isNaN(lon)) {
+        this.polygonOverlay.addVertex(lat, lon);
+        this._renderPolygonPointList();
+        this._updatePolyButtons();
+      }
+    });
+
+    // Polygon: create
+    this.createPolyBtn.addEventListener('click', () => {
+      this.polygonOverlay.create();
+      this._updatePolyButtons();
+    });
+
+    // Polygon: remove
+    this.removePolyBtn.addEventListener('click', () => {
+      this.polygonOverlay.remove();
+      this._renderPolygonPointList();
+      this._updatePolyButtons();
+    });
   }
 
   _showDroneError(message) {
@@ -232,5 +265,28 @@ export class UI {
   setWsConnected(connected) {
     this.wsStatus.textContent = connected ? 'Connected' : 'Disconnected';
     this.wsStatus.className = connected ? 'connected' : '';
+  }
+
+  _renderPolygonPointList() {
+    this.polygonPointList.innerHTML = '';
+    const verts = this.polygonOverlay.getVertices();
+    verts.forEach((v, i) => {
+      const li = document.createElement('li');
+      li.innerHTML = `
+        <span>#${i + 1}: ${v.lat.toFixed(4)}, ${v.lon.toFixed(4)}</span>
+        <span class="poly-remove" data-index="${i}">✕</span>
+      `;
+      li.querySelector('.poly-remove').addEventListener('click', () => {
+        this.polygonOverlay.removeVertex(i);
+        this._renderPolygonPointList();
+        this._updatePolyButtons();
+      });
+      this.polygonPointList.appendChild(li);
+    });
+  }
+
+  _updatePolyButtons() {
+    const count = this.polygonOverlay.getVertices().length;
+    this.createPolyBtn.disabled = count < 3 || this.polygonOverlay.isCreated();
   }
 }
