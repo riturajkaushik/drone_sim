@@ -13,3 +13,5 @@
 [x] When a set of waypoints are set for a drone, it sould be renredered on the frontend in the same color as the drone capture box and connected via dotted line - starting from the drone.
 
 [x] In frontend, implement a reset simulator button which will clear all the dorn and waypoints data - incluing ids, polygons everything. Implement the corresponiging api for backend. Finally use that clear api in the exampple scripts before spawning new dones. 
+
+[ ] Create a rest api end point in the backend to setup the Surveillance area polygon. Payload {"surveillance_polygon": [[lat, lon], ...]}. Write example script in the examples dir to create a surveillance area polygon. Then spawn a drone and follwo a set of random waypoints. Wriote enough comments to understand the script.

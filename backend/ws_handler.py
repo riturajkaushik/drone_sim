@@ -8,6 +8,7 @@ class DroneWSHandler:
     def __init__(self):
         self.connections: list[WebSocket] = []
         self.drones: dict[str, DroneState] = {}
+        self.surveillance_polygon: list[list[float]] | None = None
         self._next_id = 1
 
     def _generate_drone_id(self) -> str:
@@ -62,6 +63,7 @@ class DroneWSHandler:
     async def _handle_reset_sim(self, ws: WebSocket):
         drone_count = len(self.drones)
         self.drones.clear()
+        self.surveillance_polygon = None
         self._next_id = 1
 
         # Tell all frontends to reset

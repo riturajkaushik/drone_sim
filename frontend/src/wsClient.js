@@ -117,6 +117,19 @@ export class WSClient {
         break;
       }
 
+      case 'set_surveillance_polygon': {
+        const polygon = message.surveillance_polygon || [];
+        this.polygonOverlay.remove();
+        for (const [lat, lon] of polygon) {
+          this.polygonOverlay.addVertex(lat, lon);
+        }
+        if (polygon.length >= 3) {
+          this.polygonOverlay.create();
+        }
+        console.log(`Surveillance polygon set with ${polygon.length} vertices`);
+        break;
+      }
+
       default:
         console.warn('Unknown WS message type:', type);
     }

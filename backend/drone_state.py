@@ -42,6 +42,28 @@ class SpawnDronesResponse(BaseModel):
     drones: list[dict]  # [{"drone_id": str, "spawn_loc": [lat, lon]}, ...]
 
 
+class SurveillancePolygonRequest(BaseModel):
+    """Validates the payload for the POST /surveillance-polygon endpoint.
+    surveillance_polygon: [[lat, lon], [lat, lon], ...] — at least 3 vertices.
+    """
+    surveillance_polygon: list[list[float]]
+
+    @field_validator("surveillance_polygon")
+    @classmethod
+    def validate_polygon(cls, v: list[list[float]]) -> list[list[float]]:
+        if len(v) < 3:
+            raise ValueError("A surveillance polygon requires at least 3 vertices")
+        for i, coord in enumerate(v):
+            if len(coord) != 2:
+                raise ValueError(f"Vertex {i}: expected [lat, lon], got {coord}")
+            lat, lon = coord
+            if not (LAT_MIN <= lat <= LAT_MAX):
+                raise ValueError(f"Vertex {i}: lat {lat} out of bounds [{LAT_MIN}, {LAT_MAX}]")
+            if not (LON_MIN <= lon <= LON_MAX):
+                raise ValueError(f"Vertex {i}: lon {lon} out of bounds [{LON_MIN}, {LON_MAX}]")
+        return v
+
+
 class FollowWaypointsRequest(BaseModel):
     """Validates the payload for follow_waypoints messages.
     waypoints: {drone_id: [[lat, lon], [lat, lon], ...], ...}
