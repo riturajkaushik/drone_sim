@@ -1,9 +1,7 @@
 import * as THREE from 'three';
 import { latLonToWorld } from './coordinates.js';
 
-const VERTEX_COLOR = 0xff6644;
-const LINE_COLOR = 0xff6644;
-const FILL_COLOR = 0xff6644;
+const DEFAULT_COLOR = 0xff6644;
 const VERTEX_Z = 0.8;
 const LINE_Z = 0.7;
 const FILL_Z = 0.3;
@@ -14,10 +12,13 @@ const FILL_Z = 0.3;
  * and finalizing into a filled polygon.
  */
 export class PolygonOverlay {
-  constructor(scene) {
+  constructor(scene, options = {}) {
     this.scene = scene;
     this.vertices = []; // [{lat, lon}]
     this._created = false;
+
+    this._color = options.color ?? DEFAULT_COLOR;
+    this._colorHex = '#' + this._color.toString(16).padStart(6, '0');
 
     // Three.js objects
     this._dotSprites = [];   // one per vertex
@@ -37,7 +38,7 @@ export class PolygonOverlay {
     const ctx = canvas.getContext('2d');
     ctx.beginPath();
     ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
-    ctx.fillStyle = '#ff6644';
+    ctx.fillStyle = this._colorHex;
     ctx.fill();
     const texture = new THREE.CanvasTexture(canvas);
     return texture;
@@ -91,7 +92,7 @@ export class PolygonOverlay {
     // Filled mesh
     const geometry = new THREE.ShapeGeometry(shape);
     const material = new THREE.MeshBasicMaterial({
-      color: FILL_COLOR,
+      color: this._color,
       transparent: true,
       opacity: 0.2,
       side: THREE.DoubleSide,
@@ -104,7 +105,7 @@ export class PolygonOverlay {
     // Solid border
     const borderPts = [...worldPts, worldPts[0]].map(p => new THREE.Vector3(p.x, p.y, LINE_Z));
     const borderGeom = new THREE.BufferGeometry().setFromPoints(borderPts);
-    const borderMat = new THREE.LineBasicMaterial({ color: LINE_COLOR, linewidth: 2 });
+    const borderMat = new THREE.LineBasicMaterial({ color: this._color, linewidth: 2 });
     this._borderLine = new THREE.Line(borderGeom, borderMat);
     this.scene.add(this._borderLine);
 
@@ -164,7 +165,7 @@ export class PolygonOverlay {
 
     const geometry = new THREE.BufferGeometry().setFromPoints(pts);
     const material = new THREE.LineDashedMaterial({
-      color: LINE_COLOR,
+      color: this._color,
       dashSize: 0.15,
       gapSize: 0.1,
       linewidth: 1,

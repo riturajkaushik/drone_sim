@@ -3,9 +3,10 @@
  * Works standalone without backend.
  */
 export class UI {
-  constructor(manager, polygonOverlay) {
+  constructor(manager, polygonOverlay, corridorManager) {
     this.manager = manager;
     this.polygonOverlay = polygonOverlay;
+    this.corridorManager = corridorManager;
     this.waypointQueues = new Map(); // droneId → [{lat, lon}, ...]
 
     // Capture Area
@@ -50,6 +51,17 @@ export class UI {
     this.createPolyBtn = document.getElementById('create-poly-btn');
     this.removePolyBtn = document.getElementById('remove-poly-btn');
     this.polygonPointList = document.getElementById('polygon-point-list');
+
+    // Nav Corridors
+    this.newCorridorBtn = document.getElementById('new-corridor-btn');
+    this.corridorSelect = document.getElementById('corridor-select');
+    this.corridorLatInput = document.getElementById('corridor-lat');
+    this.corridorLonInput = document.getElementById('corridor-lon');
+    this.addCorridorPointBtn = document.getElementById('add-corridor-point-btn');
+    this.createCorridorBtn = document.getElementById('create-corridor-btn');
+    this.removeCorridorBtn = document.getElementById('remove-corridor-btn');
+    this.corridorPointList = document.getElementById('corridor-point-list');
+    this.corridorList = document.getElementById('corridor-list');
 
     // Status
     this.statusDisplay = document.getElementById('status-display');
@@ -176,6 +188,56 @@ export class UI {
       this._renderPolygonPointList();
       this._updatePolyButtons();
     });
+
+    // Nav Corridors: new corridor
+    this.newCorridorBtn.addEventListener('click', () => {
+      this.corridorManager.addCorridor();
+      this._updateCorridorSelect();
+      this._renderCorridorList();
+      this._renderCorridorPointList();
+      this._updateCorridorButtons();
+    });
+
+    // Nav Corridors: select change
+    this.corridorSelect.addEventListener('change', () => {
+      this._renderCorridorPointList();
+      this._updateCorridorButtons();
+    });
+
+    // Nav Corridors: add point
+    this.addCorridorPointBtn.addEventListener('click', () => {
+      const id = this.corridorSelect.value;
+      const entry = this.corridorManager.getCorridor(id);
+      if (!entry) return;
+      const lat = parseFloat(this.corridorLatInput.value);
+      const lon = parseFloat(this.corridorLonInput.value);
+      if (!isNaN(lat) && !isNaN(lon)) {
+        entry.overlay.addVertex(lat, lon);
+        this._renderCorridorPointList();
+        this._updateCorridorButtons();
+      }
+    });
+
+    // Nav Corridors: create
+    this.createCorridorBtn.addEventListener('click', () => {
+      const id = this.corridorSelect.value;
+      const entry = this.corridorManager.getCorridor(id);
+      if (!entry) return;
+      entry.overlay.create();
+      this._renderCorridorList();
+      this._updateCorridorButtons();
+    });
+
+    // Nav Corridors: remove selected corridor
+    this.removeCorridorBtn.addEventListener('click', () => {
+      const id = this.corridorSelect.value;
+      if (!id) return;
+      this.corridorManager.removeCorridor(id);
+      this._updateCorridorSelect();
+      this._renderCorridorList();
+      this._renderCorridorPointList();
+      this._updateCorridorButtons();
+    });
   }
 
   _showDroneError(message) {
@@ -288,5 +350,79 @@ export class UI {
   _updatePolyButtons() {
     const count = this.polygonOverlay.getVertices().length;
     this.createPolyBtn.disabled = count < 3 || this.polygonOverlay.isCreated();
+  }
+
+  // --- Nav Corridor helpers ---
+
+  _updateCorridorSelect() {
+    const corridors = this.corridorManager.getAllCorridors();
+    const prev = this.corridorSelect.value;
+    this.corridorSelect.innerHTML = '';
+    for (const c of corridors) {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.id;
+      this.corridorSelect.appendChild(opt);
+    }
+    // Select last corridor if previous selection gone
+    if (corridors.some(c => c.id === prev)) {
+      this.corridorSelect.value = prev;
+    } else if (corridors.length > 0) {
+      this.corridorSelect.value = corridors[corridors.length - 1].id;
+    }
+  }
+
+  _renderCorridorPointList() {
+    this.corridorPointList.innerHTML = '';
+    const id = this.corridorSelect.value;
+    const entry = this.corridorManager.getCorridor(id);
+    if (!entry) return;
+    const verts = entry.overlay.getVertices();
+    verts.forEach((v, i) => {
+      const li = document.createElement('li');
+      li.innerHTML = `
+        <span>#${i + 1}: ${v.lat.toFixed(4)}, ${v.lon.toFixed(4)}</span>
+        <span class="corridor-pt-remove" data-index="${i}">✕</span>
+      `;
+      li.querySelector('.corridor-pt-remove').addEventListener('click', () => {
+        entry.overlay.removeVertex(i);
+        this._renderCorridorPointList();
+        this._updateCorridorButtons();
+      });
+      this.corridorPointList.appendChild(li);
+    });
+  }
+
+  _renderCorridorList() {
+    this.corridorList.innerHTML = '';
+    for (const c of this.corridorManager.getAllCorridors()) {
+      const li = document.createElement('li');
+      const status = c.overlay.isCreated() ? '✔' : `${c.overlay.getVertices().length} pts`;
+      li.innerHTML = `
+        <span><span class="corridor-color-dot"></span>${c.id} (${status})</span>
+        <span class="corridor-remove" data-id="${c.id}">✕</span>
+      `;
+      li.querySelector('.corridor-remove').addEventListener('click', () => {
+        this.corridorManager.removeCorridor(c.id);
+        this._updateCorridorSelect();
+        this._renderCorridorList();
+        this._renderCorridorPointList();
+        this._updateCorridorButtons();
+      });
+      this.corridorList.appendChild(li);
+    }
+  }
+
+  _updateCorridorButtons() {
+    const id = this.corridorSelect.value;
+    const entry = this.corridorManager.getCorridor(id);
+    if (!entry) {
+      this.createCorridorBtn.disabled = true;
+      this.addCorridorPointBtn.disabled = true;
+      return;
+    }
+    this.addCorridorPointBtn.disabled = false;
+    const count = entry.overlay.getVertices().length;
+    this.createCorridorBtn.disabled = count < 3 || entry.overlay.isCreated();
   }
 }

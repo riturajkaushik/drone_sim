@@ -365,3 +365,97 @@ select:focus {
 #remove-poly-btn:hover {
   background: #666;
 }
+
+/* Nav Corridor controls */
+#new-corridor-btn {
+  width: 100%;
+}
+
+.full-width-btn {
+  width: 100%;
+  margin-top: 4px;
+}
+
+#corridor-point-list {
+  list-style: none;
+  max-height: 100px;
+  overflow-y: auto;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+#corridor-point-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  margin-bottom: 3px;
+}
+
+#corridor-point-list li .corridor-pt-remove {
+  cursor: pointer;
+  color: #f55;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+#corridor-list {
+  list-style: none;
+  max-height: 120px;
+  overflow-y: auto;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+#corridor-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  margin-bottom: 3px;
+}
+
+#corridor-list li .corridor-remove {
+  cursor: pointer;
+  color: #f55;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.corridor-color-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #00cccc;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+#create-corridor-btn {
+  background: #22aa44;
+}
+
+#create-corridor-btn:hover:not(:disabled) {
+  background: #1c9c3a;
+}
+
+#create-corridor-btn:disabled {
+  background: #444;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+#remove-corridor-btn {
+  background: #555;
+}
+
+#remove-corridor-btn:hover {
+  background: #666;
+}

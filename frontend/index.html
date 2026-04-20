@@ -78,7 +78,7 @@
     </section>
 
     <section class="panel-section">
-      <h3>Polygon</h3>
+      <h3>Surveillance Area</h3>
       <div class="input-row">
         <label>Lat <input type="number" id="poly-lat" step="0.0001" value="60.1620" /></label>
         <label>Lon <input type="number" id="poly-lon" step="0.0001" value="24.8900" /></label>
@@ -89,6 +89,25 @@
         <button id="create-poly-btn" disabled>✔ Create</button>
         <button id="remove-poly-btn">✕ Remove</button>
       </div>
+    </section>
+
+    <section class="panel-section">
+      <h3>Nav Corridors</h3>
+      <button id="new-corridor-btn">+ New Corridor</button>
+      <div class="input-row" style="margin-top:6px">
+        <label>Corridor <select id="corridor-select"></select></label>
+      </div>
+      <div class="input-row">
+        <label>Lat <input type="number" id="corridor-lat" step="0.0001" value="60.1620" /></label>
+        <label>Lon <input type="number" id="corridor-lon" step="0.0001" value="24.8900" /></label>
+      </div>
+      <button id="add-corridor-point-btn" class="full-width-btn">+ Add Point</button>
+      <ul id="corridor-point-list"></ul>
+      <div class="button-row" style="margin-top:6px">
+        <button id="create-corridor-btn" disabled>✔ Create</button>
+        <button id="remove-corridor-btn">✕ Remove</button>
+      </div>
+      <ul id="corridor-list"></ul>
     </section>
 
     <section class="panel-section">

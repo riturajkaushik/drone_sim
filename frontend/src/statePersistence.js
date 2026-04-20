@@ -3,7 +3,7 @@ const STORAGE_KEY = 'drone_sim_state';
 /**
  * Save the full application state to localStorage.
  */
-export function saveState(manager, ui, polygonOverlay) {
+export function saveState(manager, ui, polygonOverlay, corridorManager) {
   const state = {
     drones: manager.getAllDrones().map(d => ({
       id: d.id,
@@ -23,6 +23,7 @@ export function saveState(manager, ui, polygonOverlay) {
       vertices: polygonOverlay.getVertices(),
       created: polygonOverlay.isCreated(),
     },
+    corridors: corridorManager.getState(),
   };
 
   try {
@@ -37,7 +38,7 @@ export function saveState(manager, ui, polygonOverlay) {
  * Recreates drones and applies settings.
  * @returns {boolean} true if state was restored
  */
-export function restoreState(manager, ui, polygonOverlay) {
+export function restoreState(manager, ui, polygonOverlay, corridorManager) {
   let raw;
   try {
     raw = localStorage.getItem(STORAGE_KEY);
@@ -112,6 +113,15 @@ export function restoreState(manager, ui, polygonOverlay) {
     }
     ui._renderPolygonPointList();
     ui._updatePolyButtons();
+  }
+
+  // Restore nav corridors
+  if (state.corridors) {
+    corridorManager.restoreFromState(state.corridors);
+    ui._updateCorridorSelect();
+    ui._renderCorridorList();
+    ui._renderCorridorPointList();
+    ui._updateCorridorButtons();
   }
 
   return true;

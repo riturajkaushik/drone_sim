@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { createMapPlane } from './mapPlane.js';
 import { DroneManager } from './droneManager.js';
 import { PolygonOverlay } from './polygonOverlay.js';
+import { NavCorridorManager } from './navCorridorManager.js';
 import { UI } from './ui.js';
 import { WSClient } from './wsClient.js';
 import { MAP_WIDTH, MAP_HEIGHT } from './coordinates.js';
@@ -30,20 +31,21 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
 document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-// Create map, drone manager, and polygon overlay
+// Create map, drone manager, polygon overlay, and corridor manager
 createMapPlane(scene);
 const manager = new DroneManager(scene);
 const polygonOverlay = new PolygonOverlay(scene);
+const corridorManager = new NavCorridorManager(scene);
 
 // UI
-const ui = new UI(manager, polygonOverlay);
+const ui = new UI(manager, polygonOverlay, corridorManager);
 
 // WebSocket client (connects in background, frontend works without it)
 const wsClient = new WSClient(manager, ui);
 wsClient.connect();
 
 // Restore saved state from localStorage
-restoreState(manager, ui, polygonOverlay);
+restoreState(manager, ui, polygonOverlay, corridorManager);
 
 // Auto-save state periodically and on page unload
 let _saveTimer = null;
@@ -51,10 +53,10 @@ function scheduleSave() {
   if (_saveTimer) return;
   _saveTimer = setTimeout(() => {
     _saveTimer = null;
-    saveState(manager, ui, polygonOverlay);
+    saveState(manager, ui, polygonOverlay, corridorManager);
   }, 1000);
 }
-window.addEventListener('beforeunload', () => saveState(manager, ui, polygonOverlay));
+window.addEventListener('beforeunload', () => saveState(manager, ui, polygonOverlay, corridorManager));
 
 // Animation loop
 const clock = new THREE.Clock();
