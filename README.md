@@ -1,6 +1,6 @@
 # 🛸 Drone Map Simulation
 
-A 2D drone flight simulation built with **Three.js** (frontend) and **FastAPI** (backend). A drone sprite flies over a real map image (Lauttasaari, Helsinki), navigating to GPS coordinates entered by the user or commanded by the backend via WebSocket.
+A multi-drone simulation platform built with **Three.js** (frontend visualization), **FastAPI** (backend relay), a **Python client SDK** (command center), and a standalone **algorithms** workspace for navigation experimentation. Drone sprites fly over a real map image (Lauttasaari, Helsinki), navigating to GPS coordinates. Each drone is identified by a unique ID and can be managed independently.
 
 ![Stack](https://img.shields.io/badge/Frontend-Three.js%20+%20Vite-blue) ![Stack](https://img.shields.io/badge/Backend-FastAPI-green) ![Protocol](https://img.shields.io/badge/Protocol-WebSocket-orange)
 
@@ -22,8 +22,8 @@ A 2D drone flight simulation built with **Three.js** (frontend) and **FastAPI** 
 ## Project Structure
 
 ```
-threejs/
-├── frontend/                  # Three.js + Vite frontend
+drone_sim/
+├── frontend/                  # Three.js + Vite frontend (drone visualization)
 │   ├── index.html             # Main page with UI overlay
 │   ├── style.css              # Dark-themed control panel styles
 │   ├── vite.config.js         # Vite configuration
@@ -38,11 +38,17 @@ threejs/
 │       ├── coordinates.js     # Lat/lon ↔ Three.js world coordinate conversion
 │       ├── ui.js              # UI controls — fly-to, speed, waypoint manager, status
 │       └── wsClient.js        # WebSocket client with auto-reconnect
-├── backend/                   # FastAPI backend
+├── backend/                   # FastAPI backend (command/event relay)
 │   ├── main.py                # App + WebSocket endpoint
 │   ├── ws_handler.py          # WebSocket message handler + drone command methods
 │   ├── drone_state.py         # Pydantic models (DroneState, Waypoint)
 │   └── requirements.txt       # Python dependencies
+├── algos/                     # Navigation algorithm experimentation (standalone)
+│   ├── main.py                # Demo — polygon partitioning & route planning
+│   ├── space_partition.py     # SpacePolygon: area partitioning, TSP route planning
+│   ├── pyproject.toml         # Deps: matplotlib, pyproj, shapely
+│   └── requirements.txt       # Pip requirements
+├── drone_sim_client/          # Python client SDK (command center) — in development
 ├── map.png                    # Original map image
 ├── drone.webp                 # Original drone image
 ├── README.md
@@ -221,11 +227,14 @@ asyncio.run(test())
 
 ## Architecture Notes
 
+- **Three-layer architecture** — Client SDK → Backend → Frontend. The client SDK is the command center, the backend relays commands/events, and the frontend simulates and visualizes drones.
+- **Multi-drone by design** — each drone is identified by a unique ID and managed independently. Multi-drone support is the intended architecture (currently single-drone in the frontend/backend implementation).
 - **Simulation runs entirely in the browser** — the frontend owns the drone animation loop. The backend sends commands and receives events but does not simulate physics.
 - **Orthographic camera** — provides a true 2D top-down view with no perspective distortion.
 - **Sprite rendering** — the drone is a Three.js `Sprite` (always faces camera), rendered at z=1 above the map plane at z=0.
 - **Graceful degradation** — if the backend is unavailable, the frontend works fully standalone with auto-reconnect every 3 seconds.
 - **Fixed orientation** — the drone does not rotate to face its direction of travel.
+- **Algos are standalone** — the `algos/` folder is an independent experimentation space for navigation algorithms (e.g., area partitioning, route planning via TSP). Code is intended to be ported into the backend and client SDK once validated.
 
 ---
 
@@ -250,7 +259,8 @@ cd frontend && npm run build
 - Add map zoom/pan controls
 - Add drone trail/path visualization
 - Implement altitude (z-axis) support
-- Add multiple drone support
+- Implement multi-drone support in frontend and backend (architecture is designed for it)
+- Build out the client SDK (`drone_sim_client/`) — mission management, real-time status, local algorithm execution
 - Calibrate map coordinates to exact GPS bounds
 - Add heading/bearing display
 - Implement geofencing (restrict drone to map bounds)
