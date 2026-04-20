@@ -1,6 +1,17 @@
 const STORAGE_KEY = 'drone_sim_state';
 
 /**
+ * Clear saved state from localStorage.
+ */
+export function clearState() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (e) {
+    // silently ignore
+  }
+}
+
+/**
  * Save the full application state to localStorage.
  */
 export function saveState(manager, ui, polygonOverlay, corridorManager) {

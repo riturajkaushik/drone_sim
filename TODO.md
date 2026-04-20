@@ -8,4 +8,8 @@
     
     The api should return the drone id. The drone id shouild be createed if not provided. Otehrise use the provided one and return the same. Implement appropriate pydantic schemas.
 
-[ ] Implement the route called follow_waypoints which takes a list of lat lon and in the fronend end the drone to immnediately follow the waypoints. Example payload {<drone_id1>: [[lat, lon], [lat1, lon1], ....], <drone_id2>: ...}. Implemet appropriate pydanti schemas. Also write an exampe script in example dir called "waypoint_following.py" where youy first spawn two drones and set twoi different lsists of waypoints to them.
+[x] Implement the route called follow_waypoints which takes a list of lat lon and in the fronend end the drone to immnediately follow the waypoints. Example payload {<drone_id1>: [[lat, lon], [lat1, lon1], ....], <drone_id2>: ...}. Implemet appropriate pydanti schemas. Also write an exampe script in example dir called "waypoint_following.py" where youy first spawn two drones and set twoi different lsists of waypoints to them.
+
+[x] When a set of waypoints are set for a drone, it sould be renredered on the frontend in the same color as the drone capture box and connected via dotted line - starting from the drone.
+
+[x] In frontend, implement a reset simulator button which will clear all the dorn and waypoints data - incluing ids, polygons everything. Implement the corresponiging api for backend. Finally use that clear api in the exampple scripts before spawning new dones. 

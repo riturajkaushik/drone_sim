@@ -62,6 +62,14 @@ export class NavCorridorManager {
     }
   }
 
+  removeAll() {
+    for (const entry of this._corridors.values()) {
+      entry.overlay.dispose();
+    }
+    this._corridors.clear();
+    this._nextId = 1;
+  }
+
   get size() {
     return this._corridors.size;
   }

@@ -21,6 +21,15 @@ DRONES_TO_SPAWN = [
 
 async def main():
     async with websockets.connect(WS_URL) as ws:
+        # Reset simulator to clear any previous state
+        print("Resetting simulator...")
+        await ws.send(json.dumps({"type": "reset_sim"}))
+        while True:
+            msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5.0))
+            if msg["type"] == "reset_sim_response":
+                print(f"  Cleared {msg['cleared_drones']} previous drone(s)")
+                break
+
         request = {"type": "spawn_drones", "drones": DRONES_TO_SPAWN}
         print(f"Sending spawn request for {len(DRONES_TO_SPAWN)} drone(s)...")
         await ws.send(json.dumps(request))

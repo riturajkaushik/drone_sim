@@ -3,9 +3,11 @@
  * Gracefully degrades — frontend works without backend.
  */
 export class WSClient {
-  constructor(manager, ui, url = 'ws://localhost:8000/ws/drone') {
+  constructor(manager, ui, polygonOverlay, corridorManager, url = 'ws://localhost:8000/ws/drone') {
     this.manager = manager;
     this.ui = ui;
+    this.polygonOverlay = polygonOverlay;
+    this.corridorManager = corridorManager;
     this.url = url;
     this.ws = null;
     this.reconnectDelay = 3000;
@@ -103,6 +105,15 @@ export class WSClient {
           }
         }
         this.ui.refreshDroneList();
+        break;
+      }
+
+      case 'reset_sim': {
+        this.manager.removeAll();
+        this.polygonOverlay.remove();
+        this.corridorManager.removeAll();
+        this.ui.resetAll();
+        console.log('Simulator reset via backend');
         break;
       }
 

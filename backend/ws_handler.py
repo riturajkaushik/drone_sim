@@ -53,8 +53,26 @@ class DroneWSHandler:
         elif msg_type == "follow_waypoints":
             await self._handle_follow_waypoints(ws, message)
 
+        elif msg_type == "reset_sim":
+            await self._handle_reset_sim(ws)
+
         else:
             print(f"Unknown message type: {msg_type}")
+
+    async def _handle_reset_sim(self, ws: WebSocket):
+        drone_count = len(self.drones)
+        self.drones.clear()
+        self._next_id = 1
+
+        # Tell all frontends to reset
+        await self.send_to_all({"type": "reset_sim"})
+
+        # Confirm to the requester
+        await self._send_to(ws, {
+            "type": "reset_sim_response",
+            "cleared_drones": drone_count,
+        })
+        print(f"Simulator reset: cleared {drone_count} drone(s)")
 
     async def _handle_follow_waypoints(self, ws: WebSocket, message: dict):
         raw_waypoints = message.get("waypoints", {})

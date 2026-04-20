@@ -39,6 +39,15 @@ WAYPOINTS = {
 
 async def main():
     async with websockets.connect(WS_URL) as ws:
+        # --- Step 0: Reset simulator ---
+        print("Resetting simulator...")
+        await ws.send(json.dumps({"type": "reset_sim"}))
+        while True:
+            msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5.0))
+            if msg["type"] == "reset_sim_response":
+                print(f"  Cleared {msg['cleared_drones']} previous drone(s)")
+                break
+
         # --- Step 1: Spawn drones ---
         spawn_req = {"type": "spawn_drones", "drones": DRONES_TO_SPAWN}
         print(f"Spawning {len(DRONES_TO_SPAWN)} drone(s)...")

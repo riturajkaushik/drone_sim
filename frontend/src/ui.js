@@ -69,6 +69,9 @@ export class UI {
     // WS Status
     this.wsStatus = document.getElementById('ws-status');
 
+    // Reset
+    this.resetSimBtn = document.getElementById('reset-sim-btn');
+
     this._bindEvents();
   }
 
@@ -138,6 +141,7 @@ export class UI {
         }
         this.waypointQueues.get(droneId).push({ lat, lon });
         this._renderWaypointList();
+        this._previewWaypoints(droneId);
       }
     });
 
@@ -148,6 +152,7 @@ export class UI {
         this.waypointQueues.set(droneId, []);
       }
       this._renderWaypointList();
+      this._previewWaypoints(droneId);
     });
 
     // Fly waypoints
@@ -307,9 +312,18 @@ export class UI {
       li.querySelector('.wp-remove').addEventListener('click', () => {
         queue.splice(i, 1);
         this._renderWaypointList();
+        this._previewWaypoints(droneId);
       });
       this.waypointList.appendChild(li);
     });
+  }
+
+  _previewWaypoints(droneId) {
+    const drone = this.manager.getDrone(droneId);
+    if (!drone) return;
+    if (drone.isFlying) return; // don't override active flight visuals
+    const queue = this.waypointQueues.get(droneId) || [];
+    drone.previewWaypoints(queue);
   }
 
   updateStatus() {
@@ -333,6 +347,23 @@ export class UI {
   setWsConnected(connected) {
     this.wsStatus.textContent = connected ? 'Connected' : 'Disconnected';
     this.wsStatus.className = connected ? 'connected' : '';
+  }
+
+  /**
+   * Reset all UI state: waypoint queues, drone list, polygon, corridors, selects.
+   * Does NOT touch the managers/overlays — caller is responsible for clearing those.
+   */
+  resetAll() {
+    this.waypointQueues.clear();
+    this._renderDroneList();
+    this._updateDroneSelects();
+    this._renderWaypointList();
+    this._renderPolygonPointList();
+    this._updatePolyButtons();
+    this._updateCorridorSelect();
+    this._renderCorridorList();
+    this._renderCorridorPointList();
+    this._updateCorridorButtons();
   }
 
   _renderPolygonPointList() {

@@ -6,7 +6,7 @@ import { NavCorridorManager } from './navCorridorManager.js';
 import { UI } from './ui.js';
 import { WSClient } from './wsClient.js';
 import { MAP_WIDTH, MAP_HEIGHT } from './coordinates.js';
-import { saveState, restoreState } from './statePersistence.js';
+import { saveState, restoreState, clearState } from './statePersistence.js';
 
 // Scene setup
 const scene = new THREE.Scene();
@@ -41,11 +41,21 @@ const corridorManager = new NavCorridorManager(scene);
 const ui = new UI(manager, polygonOverlay, corridorManager);
 
 // WebSocket client (connects in background, frontend works without it)
-const wsClient = new WSClient(manager, ui);
+const wsClient = new WSClient(manager, ui, polygonOverlay, corridorManager);
 wsClient.connect();
 
 // Restore saved state from localStorage
 restoreState(manager, ui, polygonOverlay, corridorManager);
+
+// Reset Simulator button
+document.getElementById('reset-sim-btn').addEventListener('click', () => {
+  manager.removeAll();
+  polygonOverlay.remove();
+  corridorManager.removeAll();
+  ui.resetAll();
+  clearState();
+  wsClient.send({ type: 'reset_sim' });
+});
 
 // Auto-save state periodically and on page unload
 let _saveTimer = null;

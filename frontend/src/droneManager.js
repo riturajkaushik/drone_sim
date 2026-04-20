@@ -95,6 +95,14 @@ export class DroneManager {
     }
   }
 
+  removeAll() {
+    for (const drone of this.drones.values()) {
+      drone.dispose();
+    }
+    this.drones.clear();
+    this._nextId = 1;
+  }
+
   get size() {
     return this.drones.size;
   }

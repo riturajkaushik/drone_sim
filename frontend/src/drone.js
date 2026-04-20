@@ -46,6 +46,11 @@ export class Drone {
     this._captureWidthWorld = 0;
     this._captureHeightWorld = 0;
 
+    // Waypoint path visualization
+    this._waypointDots = [];
+    this._waypointLine = null;
+    this._dotTexture = this._makeWaypointDotTexture();
+
     // ID label above the drone
     this._label = this._createLabel(id);
     this._label.position.set(pos.x, pos.y + this._baseScale * 0.6, 2);
@@ -74,6 +79,89 @@ export class Drone {
     const sprite = new THREE.Sprite(material);
     sprite.scale.set(1.2, 0.3, 1);
     return sprite;
+  }
+
+  _makeWaypointDotTexture() {
+    const size = 64;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
+    ctx.fillStyle = '#' + this.color.toString(16).padStart(6, '0');
+    ctx.fill();
+    return new THREE.CanvasTexture(canvas);
+  }
+
+  _clearWaypointVisuals() {
+    for (const dot of this._waypointDots) {
+      this.scene.remove(dot);
+      dot.material.dispose();
+    }
+    this._waypointDots = [];
+
+    if (this._waypointLine) {
+      this.scene.remove(this._waypointLine);
+      this._waypointLine.geometry.dispose();
+      this._waypointLine.material.dispose();
+      this._waypointLine = null;
+    }
+  }
+
+  _buildWaypointVisuals() {
+    this._clearWaypointVisuals();
+    if (!this.waypoints || this.waypoints.length === 0) return;
+
+    // Dot at each waypoint
+    for (const wp of this.waypoints) {
+      const pos = latLonToWorld(wp.lat, wp.lon);
+      const material = new THREE.SpriteMaterial({
+        map: this._dotTexture,
+        transparent: true,
+      });
+      const sprite = new THREE.Sprite(material);
+      sprite.scale.set(0.15, 0.15, 1);
+      sprite.position.set(pos.x, pos.y, 0.8);
+      this.scene.add(sprite);
+      this._waypointDots.push(sprite);
+    }
+
+    this._updateWaypointLine();
+  }
+
+  _updateWaypointLine() {
+    if (this._waypointLine) {
+      this.scene.remove(this._waypointLine);
+      this._waypointLine.geometry.dispose();
+      this._waypointLine.material.dispose();
+      this._waypointLine = null;
+    }
+
+    const remaining = this.currentWaypointIndex >= 0
+      ? this.waypoints.slice(this.currentWaypointIndex)
+      : [];
+    if (remaining.length === 0) return;
+
+    // Build points: drone position → remaining waypoints
+    const points = [
+      new THREE.Vector3(this.sprite.position.x, this.sprite.position.y, 0.7),
+    ];
+    for (const wp of remaining) {
+      const w = latLonToWorld(wp.lat, wp.lon);
+      points.push(new THREE.Vector3(w.x, w.y, 0.7));
+    }
+
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const material = new THREE.LineDashedMaterial({
+      color: this.color,
+      dashSize: 0.15,
+      gapSize: 0.1,
+      linewidth: 1,
+    });
+    this._waypointLine = new THREE.Line(geometry, material);
+    this._waypointLine.computeLineDistances();
+    this.scene.add(this._waypointLine);
   }
 
   setCaptureArea(widthMeters, heightMeters) {
@@ -172,11 +260,49 @@ export class Drone {
     this._updateLabelPosition();
   }
 
+  previewWaypoints(waypoints) {
+    this._clearWaypointVisuals();
+    if (!waypoints || waypoints.length === 0) return;
+
+    for (const wp of waypoints) {
+      const pos = latLonToWorld(wp.lat, wp.lon);
+      const material = new THREE.SpriteMaterial({
+        map: this._dotTexture,
+        transparent: true,
+      });
+      const sprite = new THREE.Sprite(material);
+      sprite.scale.set(0.15, 0.15, 1);
+      sprite.position.set(pos.x, pos.y, 0.8);
+      this.scene.add(sprite);
+      this._waypointDots.push(sprite);
+    }
+
+    // Line from drone through all preview waypoints
+    const points = [
+      new THREE.Vector3(this.sprite.position.x, this.sprite.position.y, 0.7),
+    ];
+    for (const wp of waypoints) {
+      const w = latLonToWorld(wp.lat, wp.lon);
+      points.push(new THREE.Vector3(w.x, w.y, 0.7));
+    }
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const material = new THREE.LineDashedMaterial({
+      color: this.color,
+      dashSize: 0.15,
+      gapSize: 0.1,
+      linewidth: 1,
+    });
+    this._waypointLine = new THREE.Line(geometry, material);
+    this._waypointLine.computeLineDistances();
+    this.scene.add(this._waypointLine);
+  }
+
   setTarget(lat, lon) {
     this.waypoints = [{ lat, lon }];
     this.currentWaypointIndex = 0;
     this.targetWorld = latLonToWorld(lat, lon);
     this.isFlying = true;
+    this._buildWaypointVisuals();
     this._notifyStatusChanged();
   }
 
@@ -186,6 +312,7 @@ export class Drone {
     this.currentWaypointIndex = 0;
     this.targetWorld = latLonToWorld(waypoints[0].lat, waypoints[0].lon);
     this.isFlying = true;
+    this._buildWaypointVisuals();
     this._notifyStatusChanged();
   }
 
@@ -233,14 +360,23 @@ export class Drone {
         this.onWaypointReached(reachedWp, reachedIdx);
       }
 
+      // Remove reached waypoint dot
+      if (reachedIdx < this._waypointDots.length) {
+        const dot = this._waypointDots[reachedIdx];
+        this.scene.remove(dot);
+        dot.material.dispose();
+      }
+
       if (this.currentWaypointIndex < this.waypoints.length - 1) {
         this.currentWaypointIndex++;
         const next = this.waypoints[this.currentWaypointIndex];
         this.targetWorld = latLonToWorld(next.lat, next.lon);
+        this._updateWaypointLine();
       } else {
         this.isFlying = false;
         this.targetWorld = null;
         this.currentWaypointIndex = -1;
+        this._clearWaypointVisuals();
       }
 
       this._notifyStatusChanged();
@@ -260,6 +396,7 @@ export class Drone {
     this.lon = latLon.lon;
 
     this._updateCaptureBoxPosition();
+    this._updateWaypointLine();
   }
 
   _updateCaptureBoxPosition() {
@@ -296,6 +433,9 @@ export class Drone {
       this._captureBox.material.dispose();
       this._captureBox.geometry.dispose();
     }
+
+    this._clearWaypointVisuals();
+    this._dotTexture.dispose();
   }
 
   _notifyStatusChanged() {
