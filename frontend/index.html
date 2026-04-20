@@ -13,7 +13,30 @@
     <h2>🛸 Drone Control</h2>
 
     <section class="panel-section">
+      <h3>Capture Area</h3>
+      <div class="input-row">
+        <label>X <input type="number" id="capture-x" step="1" min="0" value="0" placeholder="meters" /></label>
+        <label>Y <input type="number" id="capture-y" step="1" min="0" value="0" placeholder="meters" /></label>
+        <button id="set-capture-btn">Set</button>
+      </div>
+    </section>
+
+    <section class="panel-section">
+      <h3>Drones</h3>
+      <div class="input-row">
+        <label>Lat <input type="number" id="drone-lat" step="0.0001" value="60.1620" /></label>
+        <label>Lon <input type="number" id="drone-lon" step="0.0001" value="24.8900" /></label>
+      </div>
+      <button id="add-drone-btn">+ Add Drone</button>
+      <div id="drone-error" class="error-message"></div>
+      <ul id="drone-list"></ul>
+    </section>
+
+    <section class="panel-section">
       <h3>Fly To</h3>
+      <div class="input-row">
+        <label>Drone <select id="fly-drone-select"></select></label>
+      </div>
       <div class="input-row">
         <label>Lat <input type="number" id="fly-lat" step="0.0001" value="60.1620" /></label>
         <label>Lon <input type="number" id="fly-lon" step="0.0001" value="24.8900" /></label>
@@ -32,6 +55,9 @@
     <section class="panel-section">
       <h3>Waypoints</h3>
       <div class="input-row">
+        <label>Drone <select id="wp-drone-select"></select></label>
+      </div>
+      <div class="input-row">
         <label>Lat <input type="number" id="wp-lat" step="0.0001" value="60.1620" /></label>
         <label>Lon <input type="number" id="wp-lon" step="0.0001" value="24.8900" /></label>
       </div>
@@ -45,12 +71,7 @@
 
     <section class="panel-section">
       <h3>Status</h3>
-      <div id="status-display">
-        <div>Lat: <span id="status-lat">—</span></div>
-        <div>Lon: <span id="status-lon">—</span></div>
-        <div>Speed: <span id="status-speed">—</span></div>
-        <div>State: <span id="status-state">Idle</span></div>
-      </div>
+      <div id="status-display"></div>
     </section>
 
     <section class="panel-section">

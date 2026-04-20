@@ -11,6 +11,17 @@ const MAP_BOUNDS = {
 const MAP_WIDTH = 19.62;   // world units (matching 1962px aspect)
 const MAP_HEIGHT = 11.52;  // world units (matching 1152px aspect)
 
+// Derived constants for meter↔world conversion
+const METERS_PER_DEG_LAT = 111_320;
+const CENTER_LAT = (MAP_BOUNDS.topLeft.lat + MAP_BOUNDS.bottomRight.lat) / 2;
+const METERS_PER_DEG_LON = METERS_PER_DEG_LAT * Math.cos(CENTER_LAT * Math.PI / 180);
+
+const LAT_RANGE = MAP_BOUNDS.topLeft.lat - MAP_BOUNDS.bottomRight.lat; // positive
+const LON_RANGE = MAP_BOUNDS.bottomRight.lon - MAP_BOUNDS.topLeft.lon; // positive
+
+const MAP_WIDTH_METERS = LON_RANGE * METERS_PER_DEG_LON;
+const MAP_HEIGHT_METERS = LAT_RANGE * METERS_PER_DEG_LAT;
+
 /**
  * Convert lat/lon to Three.js world coordinates.
  * Origin (0,0) is at the center of the map.
@@ -43,6 +54,33 @@ export function worldToLatLon(x, y) {
   const lat = topLeft.lat + ny * (bottomRight.lat - topLeft.lat);
 
   return { lat, lon };
+}
+
+/**
+ * Convert meters to world units in the X (longitude) direction.
+ * Accounts for latitude-dependent longitude scaling.
+ */
+export function metersToWorldX(meters) {
+  return (meters / MAP_WIDTH_METERS) * MAP_WIDTH;
+}
+
+/**
+ * Convert meters to world units in the Y (latitude) direction.
+ */
+export function metersToWorldY(meters) {
+  return (meters / MAP_HEIGHT_METERS) * MAP_HEIGHT;
+}
+
+/**
+ * Check if a lat/lon coordinate is within the visible map bounds.
+ */
+export function isInBounds(lat, lon) {
+  return (
+    lat >= MAP_BOUNDS.bottomRight.lat &&
+    lat <= MAP_BOUNDS.topLeft.lat &&
+    lon >= MAP_BOUNDS.topLeft.lon &&
+    lon <= MAP_BOUNDS.bottomRight.lon
+  );
 }
 
 export { MAP_BOUNDS, MAP_WIDTH, MAP_HEIGHT };

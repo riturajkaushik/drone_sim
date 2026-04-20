@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createMapPlane } from './mapPlane.js';
-import { Drone } from './drone.js';
+import { DroneManager } from './droneManager.js';
 import { UI } from './ui.js';
 import { WSClient } from './wsClient.js';
 import { MAP_WIDTH, MAP_HEIGHT } from './coordinates.js';
@@ -28,26 +28,16 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
 document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-// Create map and drone
+// Create map and drone manager
 createMapPlane(scene);
-const drone = new Drone(scene);
+const manager = new DroneManager(scene);
 
 // UI
-const ui = new UI(drone);
+const ui = new UI(manager);
 
 // WebSocket client (connects in background, frontend works without it)
-const wsClient = new WSClient(drone, ui);
+const wsClient = new WSClient(manager, ui);
 wsClient.connect();
-
-// Drone callbacks
-drone.onWaypointReached = (waypoint, index) => {
-  console.log(`Waypoint #${index} reached:`, waypoint);
-  wsClient.sendWaypointReached(waypoint, index);
-};
-
-drone.onStatusChanged = (status) => {
-  ui.updateStatus(status);
-};
 
 // Animation loop
 const clock = new THREE.Clock();
@@ -56,10 +46,10 @@ function animate() {
   requestAnimationFrame(animate);
 
   const dt = clock.getDelta();
-  drone.update(dt);
+  manager.updateAll(dt);
 
   // Continuously update status display
-  ui.updateStatus(drone.getStatus());
+  ui.updateStatus();
 
   renderer.render(scene, camera);
 }

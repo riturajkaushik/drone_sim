@@ -3,8 +3,8 @@
  * Gracefully degrades — frontend works without backend.
  */
 export class WSClient {
-  constructor(drone, ui, url = 'ws://localhost:8000/ws/drone') {
-    this.drone = drone;
+  constructor(manager, ui, url = 'ws://localhost:8000/ws/drone') {
+    this.manager = manager;
     this.ui = ui;
     this.url = url;
     this.ws = null;
@@ -50,22 +50,25 @@ export class WSClient {
   }
 
   _handleMessage(message) {
-    const { type } = message;
+    const { type, drone_id } = message;
+    // If a drone_id is specified, target that drone; otherwise first drone
+    const drone = drone_id
+      ? this.manager.getDrone(drone_id)
+      : this.manager.getAllDrones()[0];
 
     switch (type) {
       case 'set_waypoints': {
+        if (!drone) break;
         const waypoints = message.waypoints || [];
-        this.drone.setWaypoints(waypoints);
-        // Also update the UI waypoint queue display
-        this.ui.waypointQueue = [...waypoints];
-        this.ui._renderWaypointList();
+        drone.setWaypoints(waypoints);
         break;
       }
 
       case 'set_velocity': {
+        if (!drone) break;
         const speed = message.speed;
         if (speed !== undefined) {
-          this.drone.setSpeed(speed);
+          drone.setSpeed(speed);
           this.ui.speedSlider.value = speed;
           this.ui.speedValue.textContent = `${speed} m/s`;
         }
@@ -73,10 +76,11 @@ export class WSClient {
       }
 
       case 'get_status': {
-        const status = this.drone.getStatus();
+        // Return status for all drones
+        const statuses = this.manager.getAllDrones().map(d => d.getStatus());
         this.send({
           type: 'status_response',
-          ...status,
+          drones: statuses,
         });
         break;
       }
@@ -92,9 +96,10 @@ export class WSClient {
     }
   }
 
-  sendWaypointReached(waypoint, index) {
+  sendWaypointReached(droneId, waypoint, index) {
     this.send({
       type: 'waypoint_reached',
+      drone_id: droneId,
       waypoint,
       index,
     });
