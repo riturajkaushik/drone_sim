@@ -4,6 +4,7 @@ import { DroneManager } from './droneManager.js';
 import { UI } from './ui.js';
 import { WSClient } from './wsClient.js';
 import { MAP_WIDTH, MAP_HEIGHT } from './coordinates.js';
+import { saveState, restoreState } from './statePersistence.js';
 
 // Scene setup
 const scene = new THREE.Scene();
@@ -39,6 +40,20 @@ const ui = new UI(manager);
 const wsClient = new WSClient(manager, ui);
 wsClient.connect();
 
+// Restore saved state from localStorage
+restoreState(manager, ui);
+
+// Auto-save state periodically and on page unload
+let _saveTimer = null;
+function scheduleSave() {
+  if (_saveTimer) return;
+  _saveTimer = setTimeout(() => {
+    _saveTimer = null;
+    saveState(manager, ui);
+  }, 1000);
+}
+window.addEventListener('beforeunload', () => saveState(manager, ui));
+
 // Animation loop
 const clock = new THREE.Clock();
 
@@ -50,6 +65,9 @@ function animate() {
 
   // Continuously update status display
   ui.updateStatus();
+
+  // Throttled auto-save (every ~1s)
+  scheduleSave();
 
   renderer.render(scene, camera);
 }

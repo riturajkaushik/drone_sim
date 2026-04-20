@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { latLonToWorld, worldToLatLon, metersToWorldX, metersToWorldY } from './coordinates.js';
 
-const ARRIVAL_THRESHOLD = 0.05; // world units
+const ARRIVAL_THRESHOLD = 0.005; // world units — small enough to avoid visible snap
 
 // Colors for distinguishing multiple drones
 const DRONE_COLORS = [
@@ -46,7 +46,34 @@ export class Drone {
     this._captureWidthWorld = 0;
     this._captureHeightWorld = 0;
 
+    // ID label above the drone
+    this._label = this._createLabel(id);
+    this._label.position.set(pos.x, pos.y + this._baseScale * 0.6, 2);
+    scene.add(this._label);
+  }
 
+  _createLabel(text) {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = 256;
+    canvas.height = 64;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.font = 'bold 36px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    // Outline for readability
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.lineWidth = 4;
+    ctx.strokeText(text, canvas.width / 2, canvas.height / 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(1.2, 0.3, 1);
+    return sprite;
   }
 
   setCaptureArea(widthMeters, heightMeters) {
@@ -96,6 +123,7 @@ export class Drone {
     this._scalePercent = Math.max(10, Math.min(500, percent));
     const s = this._baseScale * (this._scalePercent / 100);
     this.sprite.scale.set(s, s, 1);
+    this._updateLabelPosition();
   }
 
   setTarget(lat, lon) {
@@ -196,11 +224,25 @@ export class Drone {
         0,
       );
     }
+    this._updateLabelPosition();
+  }
+
+  _updateLabelPosition() {
+    const s = this._baseScale * (this._scalePercent / 100);
+    this._label.position.set(
+      this.sprite.position.x,
+      this.sprite.position.y + s * 0.6,
+      2,
+    );
   }
 
   dispose() {
     this.scene.remove(this.sprite);
     this.sprite.material.dispose();
+
+    this.scene.remove(this._label);
+    this._label.material.map.dispose();
+    this._label.material.dispose();
 
     if (this._captureBox) {
       this.scene.remove(this._captureBox);
