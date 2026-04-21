@@ -1,6 +1,6 @@
 from fastapi import WebSocket
 import json
-from drone_state import DroneState, Waypoint, SpawnDroneRequest, FollowWaypointsRequest
+from drone_state import DroneState, Waypoint, SpawnDroneRequest, SpawnDronesRequest, FollowWaypointsRequest
 from pydantic import ValidationError
 
 
@@ -48,9 +48,6 @@ class DroneWSHandler:
             wp = message.get("waypoint", {})
             idx = message.get("index", -1)
             print(f"Drone {drone_id} reached waypoint #{idx}: ({wp.get('lat')}, {wp.get('lon')})")
-
-        elif msg_type == "spawn_drones":
-            await self._handle_spawn_drones(ws, message)
 
         elif msg_type == "follow_waypoints":
             await self._handle_follow_waypoints(ws, message)
@@ -105,37 +102,27 @@ class DroneWSHandler:
         })
         print(f"follow_waypoints: dispatched waypoints to {list(req.waypoints.keys())}")
 
-    async def _handle_spawn_drones(self, ws: WebSocket, message: dict):
-        raw_drones = message.get("drones", [])
-        if not raw_drones:
-            await self._send_error(ws, "No drones provided in spawn request.")
-            return
+    async def spawn_drones(self, req: SpawnDronesRequest) -> list[dict]:
+        """Register and broadcast new drones. Returns list of spawned drone info dicts.
 
-        # Validate each request via Pydantic
-        requests: list[SpawnDroneRequest] = []
-        for i, raw in enumerate(raw_drones):
-            try:
-                requests.append(SpawnDroneRequest(**raw))
-            except ValidationError as e:
-                await self._send_error(ws, f"Invalid drone at index {i}: {e.errors()}")
-                return
+        Raises ValueError on validation failures (duplicate IDs, occupied locations).
+        """
+        requests: list[SpawnDroneRequest] = req.drones
 
         # Collect IDs — assign where missing, check duplicates
         assigned: list[tuple[str, list[float]]] = []
         new_ids: set[str] = set()
 
-        for req in requests:
-            drone_id = req.drone_id or self._generate_drone_id()
+        for spawn_req in requests:
+            drone_id = spawn_req.drone_id or self._generate_drone_id()
 
             if drone_id in self.drones:
-                await self._send_error(ws, f"Drone ID '{drone_id}' already exists.")
-                return
+                raise ValueError(f"Drone ID '{drone_id}' already exists.")
             if drone_id in new_ids:
-                await self._send_error(ws, f"Duplicate drone ID '{drone_id}' in request.")
-                return
+                raise ValueError(f"Duplicate drone ID '{drone_id}' in request.")
 
             new_ids.add(drone_id)
-            assigned.append((drone_id, req.spawn_loc))
+            assigned.append((drone_id, spawn_req.spawn_loc))
 
         # Check location uniqueness against existing drones and within request
         all_locations: list[tuple[float, float]] = [
@@ -144,11 +131,9 @@ class DroneWSHandler:
         for drone_id, spawn_loc in assigned:
             loc_tuple = (spawn_loc[0], spawn_loc[1])
             if loc_tuple in all_locations:
-                await self._send_error(
-                    ws,
-                    f"Spawn location ({spawn_loc[0]}, {spawn_loc[1]}) is already occupied.",
+                raise ValueError(
+                    f"Spawn location ({spawn_loc[0]}, {spawn_loc[1]}) is already occupied."
                 )
-                return
             all_locations.append(loc_tuple)
 
         # All checks passed — register drones
@@ -168,14 +153,10 @@ class DroneWSHandler:
             "drones": response_drones,
         })
 
-        # Send confirmation back to the requester
-        await self._send_to(ws, {
-            "type": "spawn_drones_response",
-            "drones": response_drones,
-        })
-
         print(f"Spawned {len(response_drones)} drone(s): "
               f"{[d['drone_id'] for d in response_drones]}")
+
+        return response_drones
 
     async def _send_error(self, ws: WebSocket, error_msg: str):
         await self._send_to(ws, {"type": "error", "message": error_msg})

@@ -146,29 +146,21 @@ async def main():
         await asyncio.sleep(0.2)
 
         # ------------------------------------------------------------------
-        # Step 3: Spawn a drone inside the surveillance area
+        # Step 3: Spawn a drone inside the surveillance area via REST API
         # ------------------------------------------------------------------
         drone_id = "surveyor-1"
         print(f"\n[Step 3] Spawning drone '{drone_id}' at "
-              f"({DRONE_SPAWN_LAT}, {DRONE_SPAWN_LON})...")
-        spawn_req = {
-            "type": "spawn_drones",
-            "drones": [
+              f"({DRONE_SPAWN_LAT}, {DRONE_SPAWN_LON}) via REST API...")
+        resp = requests.post(
+            f"{REST_BASE_URL}/spawn-drones",
+            json={"drones": [
                 {"spawn_loc": [DRONE_SPAWN_LAT, DRONE_SPAWN_LON], "drone_id": drone_id}
-            ],
-        }
-        await ws.send(json.dumps(spawn_req))
-
-        # Wait for the spawn confirmation from the backend.
-        while True:
-            msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5.0))
-            if msg["type"] == "spawn_drones_response":
-                for d in msg["drones"]:
-                    print(f"  Spawned {d['drone_id']} at {d['spawn_loc']}")
-                break
-            elif msg["type"] == "error":
-                print(f"  Error: {msg['message']}")
-                return
+            ]},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        for d in data["drones"]:
+            print(f"  Spawned {d['drone_id']} at {d['spawn_loc']}")
 
         # ------------------------------------------------------------------
         # Step 4: Generate random waypoints inside the polygon's bounding box

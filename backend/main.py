@@ -1,8 +1,9 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import json
 from ws_handler import DroneWSHandler
-from drone_state import SurveillancePolygonRequest, NavCorridorsRequest
+from drone_state import SurveillancePolygonRequest, NavCorridorsRequest, SpawnDronesRequest
 
 app = FastAPI(title="Drone Simulation Backend")
 
@@ -61,6 +62,19 @@ async def set_nav_corridors(req: NavCorridorsRequest):
             cid: len(verts) for cid, verts in req.nav_corridors.items()
         },
         "nav_corridors": req.nav_corridors,
+    }
+
+
+@app.post("/spawn-drones")
+async def spawn_drones(req: SpawnDronesRequest):
+    """Spawn drones and broadcast them to all connected frontends."""
+    try:
+        drones = await handler.spawn_drones(req)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"status": "error", "message": str(e)})
+    return {
+        "status": "ok",
+        "drones": drones,
     }
 
 

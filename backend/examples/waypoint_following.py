@@ -9,9 +9,12 @@ Usage:
 
 import asyncio
 import json
+
+import requests
 import websockets
 
 WS_URL = "ws://localhost:8000/ws/drone"
+REST_BASE_URL = "http://localhost:8000"
 
 DRONES_TO_SPAWN = [
     {"spawn_loc": [60.1620, 24.8800], "drone_id": "alpha"},
@@ -48,21 +51,16 @@ async def main():
                 print(f"  Cleared {msg['cleared_drones']} previous drone(s)")
                 break
 
-        # --- Step 1: Spawn drones ---
-        spawn_req = {"type": "spawn_drones", "drones": DRONES_TO_SPAWN}
-        print(f"Spawning {len(DRONES_TO_SPAWN)} drone(s)...")
-        await ws.send(json.dumps(spawn_req))
-
-        # Wait for spawn confirmation
-        while True:
-            msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5.0))
-            if msg["type"] == "spawn_drones_response":
-                for d in msg["drones"]:
-                    print(f"  Spawned {d['drone_id']} at {d['spawn_loc']}")
-                break
-            elif msg["type"] == "error":
-                print(f"  Error: {msg['message']}")
-                return
+        # --- Step 1: Spawn drones via REST API ---
+        print(f"Spawning {len(DRONES_TO_SPAWN)} drone(s) via REST API...")
+        resp = requests.post(
+            f"{REST_BASE_URL}/spawn-drones",
+            json={"drones": DRONES_TO_SPAWN},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        for d in data["drones"]:
+            print(f"  Spawned {d['drone_id']} at {d['spawn_loc']}")
 
         # --- Step 2: Send follow_waypoints ---
         follow_req = {"type": "follow_waypoints", "waypoints": WAYPOINTS}

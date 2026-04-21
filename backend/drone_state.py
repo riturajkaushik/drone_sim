@@ -38,6 +38,13 @@ class SpawnDroneRequest(BaseModel):
         return v
 
 
+class SpawnDronesRequest(BaseModel):
+    """Validates the payload for the POST /spawn-drones endpoint.
+    drones: list of SpawnDroneRequest objects.
+    """
+    drones: list[SpawnDroneRequest]
+
+
 class SpawnDronesResponse(BaseModel):
     drones: list[dict]  # [{"drone_id": str, "spawn_loc": [lat, lon]}, ...]
 

@@ -156,24 +156,20 @@ async def main():
             print(f"  {cid}: {vcount} vertices")
         await asyncio.sleep(0.2)
 
-        # Step 4: Spawn drone at the entry corridor start
+        # Step 4: Spawn drone at the entry corridor start via REST API
         drone_id = "patrol-1"
         print(f"\n[Step 4] Spawning drone '{drone_id}' at "
-              f"({DRONE_SPAWN_LAT}, {DRONE_SPAWN_LON})...")
-        await ws.send(json.dumps({
-            "type": "spawn_drones",
-            "drones": [{"spawn_loc": [DRONE_SPAWN_LAT, DRONE_SPAWN_LON],
-                         "drone_id": drone_id}],
-        }))
-        while True:
-            msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5.0))
-            if msg["type"] == "spawn_drones_response":
-                for d in msg["drones"]:
-                    print(f"  Spawned {d['drone_id']} at {d['spawn_loc']}")
-                break
-            elif msg["type"] == "error":
-                print(f"  Error: {msg['message']}")
-                return
+              f"({DRONE_SPAWN_LAT}, {DRONE_SPAWN_LON}) via REST API...")
+        resp = requests.post(
+            f"{REST_BASE_URL}/spawn-drones",
+            json={"drones": [
+                {"spawn_loc": [DRONE_SPAWN_LAT, DRONE_SPAWN_LON], "drone_id": drone_id}
+            ]},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        for d in data["drones"]:
+            print(f"  Spawned {d['drone_id']} at {d['spawn_loc']}")
 
         # Step 5: Build flight plan
         entry_waypoints = corridor_centerline(ENTRY_CORRIDOR)
