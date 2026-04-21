@@ -7,6 +7,7 @@ from pydantic import ValidationError
 class DroneWSHandler:
     def __init__(self):
         self.connections: list[WebSocket] = []
+        self.sim_state_connections: list[WebSocket] = []
         self.drones: dict[str, DroneState] = {}
         self.surveillance_polygon: list[list[float]] | None = None
         self.nav_corridors: dict[str, list[list[float]]] | None = None
@@ -47,6 +48,16 @@ class DroneWSHandler:
             drone_id = message.get("drone_id", "unknown")
             wp = message.get("waypoint", {})
             idx = message.get("index", -1)
+            # Update backend state tracking
+            if drone_id in self.drones:
+                state = self.drones[drone_id]
+                state.current_waypoint_index = idx
+                state.lat = wp.get("lat", state.lat)
+                state.lon = wp.get("lon", state.lon)
+                # If this was the last waypoint, mark as not flying
+                if idx >= len(state.waypoints) - 1:
+                    state.is_flying = False
+                    state.current_waypoint_index = None
             print(f"Drone {drone_id} reached waypoint #{idx}: ({wp.get('lat')}, {wp.get('lon')})")
 
         elif msg_type == "follow_waypoints":
@@ -83,24 +94,35 @@ class DroneWSHandler:
             await self._send_error(ws, f"Invalid follow_waypoints payload: {e.errors()}")
             return
 
-        # Verify all drone IDs exist before sending any commands
-        missing = [did for did in req.waypoints if did not in self.drones]
-        if missing:
-            await self._send_error(ws, f"Unknown drone ID(s): {missing}")
+        result = await self.dispatch_waypoints(req)
+        if "error" in result:
+            await self._send_error(ws, result["error"])
             return
 
-        # Fan out set_waypoints per drone
+        await self._send_to(ws, {
+            "type": "follow_waypoints_response",
+            "drones": result["drones"],
+        })
+        print(f"follow_waypoints: dispatched waypoints to {list(req.waypoints.keys())}")
+
+    async def dispatch_waypoints(self, req: FollowWaypointsRequest) -> dict:
+        """Validate and dispatch waypoints to drones. Returns result dict.
+
+        Used by both the WS handler and the REST endpoint.
+        """
+        missing = [did for did in req.waypoints if did not in self.drones]
+        if missing:
+            return {"error": f"Unknown drone ID(s): {missing}"}
+
         for drone_id, coord_list in req.waypoints.items():
             waypoints_dicts = [{"lat": c[0], "lon": c[1]} for c in coord_list]
             await self.set_waypoints(drone_id, waypoints_dicts)
 
-        await self._send_to(ws, {
-            "type": "follow_waypoints_response",
+        return {
             "drones": {
                 did: len(wps) for did, wps in req.waypoints.items()
             },
-        })
-        print(f"follow_waypoints: dispatched waypoints to {list(req.waypoints.keys())}")
+        }
 
     async def spawn_drones(self, req: SpawnDronesRequest) -> list[dict]:
         """Register and broadcast new drones. Returns list of spawned drone info dicts.
@@ -183,6 +205,8 @@ class DroneWSHandler:
         """Command a drone to fly to a sequence of waypoints."""
         if drone_id in self.drones:
             self.drones[drone_id].waypoints = [Waypoint(**wp) for wp in waypoints]
+            self.drones[drone_id].current_waypoint_index = 0
+            self.drones[drone_id].is_flying = True
         await self.send_to_all({
             "type": "set_waypoints",
             "drone_id": drone_id,
@@ -204,3 +228,62 @@ class DroneWSHandler:
         await self.send_to_all({
             "type": "get_status",
         })
+
+    # --- Sim-state WebSocket helpers ---
+
+    def register_sim_state(self, ws: WebSocket):
+        self.sim_state_connections.append(ws)
+        print(f"Sim-state client connected. Total: {len(self.sim_state_connections)}")
+
+    def unregister_sim_state(self, ws: WebSocket):
+        if ws in self.sim_state_connections:
+            self.sim_state_connections.remove(ws)
+        print(f"Sim-state client disconnected. Total: {len(self.sim_state_connections)}")
+
+    def get_sim_state(self) -> dict:
+        """Build the full simulation state snapshot."""
+        drones = []
+        for drone_id, state in self.drones.items():
+            all_waypoints = [{"lat": wp.lat, "lon": wp.lon} for wp in state.waypoints]
+            idx = state.current_waypoint_index
+            if idx is not None and state.is_flying:
+                completed = all_waypoints[:idx]
+                pending = all_waypoints[idx:]
+            elif not state.is_flying and len(all_waypoints) > 0:
+                completed = all_waypoints
+                pending = []
+            else:
+                completed = []
+                pending = all_waypoints
+            drones.append({
+                "id": drone_id,
+                "lat": state.lat,
+                "lon": state.lon,
+                "speed": state.speed,
+                "is_flying": state.is_flying,
+                "current_waypoint_index": state.current_waypoint_index,
+                "waypoints": all_waypoints,
+                "completed_waypoints": completed,
+                "pending_waypoints": pending,
+            })
+        return {
+            "type": "sim_state",
+            "drones": drones,
+            "surveillance_polygon": self.surveillance_polygon,
+            "nav_corridors": self.nav_corridors,
+        }
+
+    async def broadcast_sim_state(self):
+        """Push the current sim state to all sim-state WebSocket clients."""
+        if not self.sim_state_connections:
+            return
+        state = self.get_sim_state()
+        data = json.dumps(state)
+        disconnected = []
+        for ws in self.sim_state_connections:
+            try:
+                await ws.send_text(data)
+            except Exception:
+                disconnected.append(ws)
+        for ws in disconnected:
+            self.unregister_sim_state(ws)

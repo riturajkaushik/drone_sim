@@ -1,9 +1,10 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+import asyncio
 import json
 from ws_handler import DroneWSHandler
-from drone_state import SurveillancePolygonRequest, NavCorridorsRequest, SpawnDronesRequest
+from drone_state import SurveillancePolygonRequest, NavCorridorsRequest, SpawnDronesRequest, FollowWaypointsRequest
 
 app = FastAPI(title="Drone Simulation Backend")
 
@@ -78,6 +79,42 @@ async def spawn_drones(req: SpawnDronesRequest):
     }
 
 
+@app.post("/set-waypoints")
+async def set_waypoints(req: FollowWaypointsRequest):
+    """Set waypoints for one or more drones via REST API.
+
+    Payload: {"waypoints": {"drone-1": [[lat, lon], ...], "drone-2": [[lat, lon], ...], ...}}
+    """
+    result = await handler.dispatch_waypoints(req)
+    if "error" in result:
+        return JSONResponse(status_code=400, content={"status": "error", "message": result["error"]})
+    return {
+        "status": "ok",
+        "drones": result["drones"],
+    }
+
+
 @app.get("/")
 async def root():
     return {"status": "Drone simulation backend running"}
+
+
+@app.websocket("/ws/sim-state")
+async def sim_state_websocket(websocket: WebSocket):
+    """WebSocket that streams the full simulation state every 500ms."""
+    await websocket.accept()
+    handler.register_sim_state(websocket)
+    try:
+        # Send initial state immediately
+        state = handler.get_sim_state()
+        await websocket.send_text(json.dumps(state))
+
+        # Push state updates periodically
+        while True:
+            await asyncio.sleep(0.5)
+            state = handler.get_sim_state()
+            await websocket.send_text(json.dumps(state))
+    except WebSocketDisconnect:
+        handler.unregister_sim_state(websocket)
+    except Exception:
+        handler.unregister_sim_state(websocket)

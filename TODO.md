@@ -18,4 +18,6 @@
 
 [x] Create rest api end point to create the nav corridors. The payload is a lost of polygons ["corridor_0": [[lat, lon], ...], "corridor_2": [[lat, lon], ...]]. Implement proper pydantic schema and implement example script. It should set a surveillance polygon, set two nav corridors to reach and exit the surveillance area and spawn one drop and follow a random waypoints list
 
-[ ] Make drone spawning a REST api endpoint in the backend for the client. Accordingly, Update the examples scripts 
+[ ] Make drone spawning a REST api endpoint in the backend for the client. Accordingly, Update the examples scripts
+
+[x] Implement set waypoints as REST API endpoint (`POST /set-waypoints`). Implement sim state WebSocket (`/ws/sim-state`) streaming drone locations, waypoints (completed/pending), velocities, surveillance area, and nav corridors. Updated example scripts to use REST for waypoints and sim-state WS for monitoring. 

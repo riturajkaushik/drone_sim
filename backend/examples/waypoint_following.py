@@ -1,6 +1,9 @@
 """
 Example: Spawn two drones and send them on different waypoint routes.
 
+Uses REST API for all commands (reset, spawn, set waypoints) and optionally
+connects to the sim-state WebSocket for monitoring progress.
+
 Usage:
     1. Start the backend:   cd backend && uvicorn main:app --reload --port 8000
     2. Start the frontend:  cd frontend && npm run dev
@@ -13,8 +16,9 @@ import json
 import requests
 import websockets
 
-WS_URL = "ws://localhost:8000/ws/drone"
 REST_BASE_URL = "http://localhost:8000"
+WS_URL = "ws://localhost:8000/ws/drone"
+SIM_STATE_URL = "ws://localhost:8000/ws/sim-state"
 
 DRONES_TO_SPAWN = [
     {"spawn_loc": [60.1620, 24.8800], "drone_id": "alpha"},
@@ -41,6 +45,7 @@ WAYPOINTS = {
 
 
 async def main():
+    # We still need the drone WS for reset (which is a WS-only command)
     async with websockets.connect(WS_URL) as ws:
         # --- Step 0: Reset simulator ---
         print("Resetting simulator...")
@@ -51,53 +56,58 @@ async def main():
                 print(f"  Cleared {msg['cleared_drones']} previous drone(s)")
                 break
 
-        # --- Step 1: Spawn drones via REST API ---
-        print(f"Spawning {len(DRONES_TO_SPAWN)} drone(s) via REST API...")
-        resp = requests.post(
-            f"{REST_BASE_URL}/spawn-drones",
-            json={"drones": DRONES_TO_SPAWN},
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        for d in data["drones"]:
-            print(f"  Spawned {d['drone_id']} at {d['spawn_loc']}")
+    # --- Step 1: Spawn drones via REST API ---
+    print(f"\nSpawning {len(DRONES_TO_SPAWN)} drone(s) via REST API...")
+    resp = requests.post(
+        f"{REST_BASE_URL}/spawn-drones",
+        json={"drones": DRONES_TO_SPAWN},
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    for d in data["drones"]:
+        print(f"  Spawned {d['drone_id']} at {d['spawn_loc']}")
 
-        # --- Step 2: Send follow_waypoints ---
-        follow_req = {"type": "follow_waypoints", "waypoints": WAYPOINTS}
-        print(f"\nSending waypoints to {list(WAYPOINTS.keys())}...")
-        await ws.send(json.dumps(follow_req))
+    # --- Step 2: Set waypoints via REST API ---
+    print(f"\nSetting waypoints for {list(WAYPOINTS.keys())} via REST API...")
+    resp = requests.post(
+        f"{REST_BASE_URL}/set-waypoints",
+        json={"waypoints": WAYPOINTS},
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    for drone_id, count in data["drones"].items():
+        print(f"  {drone_id}: {count} waypoint(s) dispatched")
 
-        # Wait for follow_waypoints confirmation
+    # --- Step 3: Monitor progress via sim-state WebSocket ---
+    print("\nMonitoring progress via sim-state WebSocket (Ctrl+C to stop)...\n")
+    total_waypoints = {did: len(wps) for did, wps in WAYPOINTS.items()}
+
+    async with websockets.connect(SIM_STATE_URL) as ws:
         while True:
-            msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5.0))
-            if msg["type"] == "follow_waypoints_response":
-                for drone_id, count in msg["drones"].items():
-                    print(f"  {drone_id}: {count} waypoint(s) dispatched")
-                break
-            elif msg["type"] == "error":
-                print(f"  Error: {msg['message']}")
-                return
-
-        # --- Step 3: Listen for waypoint_reached events ---
-        print("\nListening for waypoint events (Ctrl+C to stop)...\n")
-        remaining = {did: len(wps) for did, wps in WAYPOINTS.items()}
-
-        while any(r > 0 for r in remaining.values()):
             try:
-                msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=60.0))
+                raw = await asyncio.wait_for(ws.recv(), timeout=120.0)
             except asyncio.TimeoutError:
-                print("Timed out waiting for waypoint events.")
+                print("Timed out waiting for state updates.")
                 break
 
-            if msg["type"] == "waypoint_reached":
-                did = msg.get("drone_id", "?")
-                wp = msg.get("waypoint", {})
-                idx = msg.get("index", -1)
-                print(f"  {did} reached waypoint #{idx}: ({wp.get('lat', 0):.4f}, {wp.get('lon', 0):.4f})")
-                if did in remaining:
-                    remaining[did] = max(0, remaining[did] - 1)
+            state = json.loads(raw)
+            all_done = True
+            for drone in state.get("drones", []):
+                did = drone["id"]
+                if did in total_waypoints:
+                    completed = len(drone.get("completed_waypoints", []))
+                    total = total_waypoints[did]
+                    status = "Idle" if not drone["is_flying"] else "Flying"
+                    print(f"  {did}: {status} | "
+                          f"pos=({drone['lat']:.4f}, {drone['lon']:.4f}) | "
+                          f"waypoints: {completed}/{total}")
+                    if drone["is_flying"]:
+                        all_done = False
 
-        print("\nAll waypoints reached. Done.")
+            if all_done:
+                break
+
+    print("\nAll waypoints reached. Done.")
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ This script demonstrates a complete drone mission workflow:
   4. Spawn a drone at the start of the entry corridor.
   5. Generate random waypoints inside the surveillance polygon's bounding box.
   6. Build the full flight plan: entry corridor → random surveillance waypoints → exit corridor.
-  7. Command the drone to follow the plan and listen for progress until done.
+  7. Command the drone to follow the plan via REST API and monitor via sim-state WebSocket.
 
 Usage:
     1. Start the backend:   cd backend && uvicorn main:app --reload --port 8000
@@ -30,6 +30,7 @@ import websockets
 
 REST_BASE_URL = "http://localhost:8000"
 WS_URL = "ws://localhost:8000/ws/drone"
+SIM_STATE_URL = "ws://localhost:8000/ws/sim-state"
 
 # Surveillance polygon — irregular area in central Lauttasaari.
 SURVEILLANCE_POLYGON = [
@@ -97,8 +98,7 @@ def corridor_centerline(corridor: list[list[float]]) -> list[list[float]]:
     """Extract a flyable centerline from a corridor polygon.
 
     Assumes the corridor is defined as a narrow quad: the first two vertices
-    form one end, the last two form the other end. The centerline connects the
-    midpoints of opposite edges.
+    form one end, the last two form the other end.
     """
     n = len(corridor)
     half = n // 2
@@ -116,11 +116,9 @@ def corridor_centerline(corridor: list[list[float]]) -> list[list[float]]:
 # ---------------------------------------------------------------------------
 
 async def main():
-    print("Connecting to backend WebSocket...")
+    # Step 1: Reset via WS
+    print("[Step 1] Resetting simulator...")
     async with websockets.connect(WS_URL) as ws:
-
-        # Step 1: Reset
-        print("\n[Step 1] Resetting simulator...")
         await ws.send(json.dumps({"type": "reset_sim"}))
         while True:
             msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5.0))
@@ -128,107 +126,100 @@ async def main():
                 print(f"  Cleared {msg['cleared_drones']} previous drone(s)")
                 break
 
-        # Step 2: Set surveillance polygon
-        print("\n[Step 2] Setting surveillance polygon...")
-        resp = requests.post(
-            f"{REST_BASE_URL}/surveillance-polygon",
-            json={"surveillance_polygon": SURVEILLANCE_POLYGON},
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        print(f"  Polygon accepted — {data['vertices']} vertices")
-        await asyncio.sleep(0.2)
+    # Step 2: Set surveillance polygon via REST
+    print("\n[Step 2] Setting surveillance polygon...")
+    resp = requests.post(
+        f"{REST_BASE_URL}/surveillance-polygon",
+        json={"surveillance_polygon": SURVEILLANCE_POLYGON},
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    print(f"  Polygon accepted — {data['vertices']} vertices")
 
-        # Step 3: Set navigation corridors
-        print("\n[Step 3] Setting navigation corridors...")
-        resp = requests.post(
-            f"{REST_BASE_URL}/nav-corridors",
-            json={
-                "nav_corridors": {
-                    "entry": ENTRY_CORRIDOR,
-                    "exit": EXIT_CORRIDOR,
-                },
+    # Step 3: Set navigation corridors via REST
+    print("\n[Step 3] Setting navigation corridors...")
+    resp = requests.post(
+        f"{REST_BASE_URL}/nav-corridors",
+        json={
+            "nav_corridors": {
+                "entry": ENTRY_CORRIDOR,
+                "exit": EXIT_CORRIDOR,
             },
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        for cid, vcount in data["corridors"].items():
-            print(f"  {cid}: {vcount} vertices")
-        await asyncio.sleep(0.2)
+        },
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    for cid, vcount in data["corridors"].items():
+        print(f"  {cid}: {vcount} vertices")
 
-        # Step 4: Spawn drone at the entry corridor start via REST API
-        drone_id = "patrol-1"
-        print(f"\n[Step 4] Spawning drone '{drone_id}' at "
-              f"({DRONE_SPAWN_LAT}, {DRONE_SPAWN_LON}) via REST API...")
-        resp = requests.post(
-            f"{REST_BASE_URL}/spawn-drones",
-            json={"drones": [
-                {"spawn_loc": [DRONE_SPAWN_LAT, DRONE_SPAWN_LON], "drone_id": drone_id}
-            ]},
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        for d in data["drones"]:
-            print(f"  Spawned {d['drone_id']} at {d['spawn_loc']}")
+    # Step 4: Spawn drone via REST
+    drone_id = "patrol-1"
+    print(f"\n[Step 4] Spawning drone '{drone_id}' at "
+          f"({DRONE_SPAWN_LAT}, {DRONE_SPAWN_LON})...")
+    resp = requests.post(
+        f"{REST_BASE_URL}/spawn-drones",
+        json={"drones": [
+            {"spawn_loc": [DRONE_SPAWN_LAT, DRONE_SPAWN_LON], "drone_id": drone_id}
+        ]},
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    for d in data["drones"]:
+        print(f"  Spawned {d['drone_id']} at {d['spawn_loc']}")
 
-        # Step 5: Build flight plan
-        entry_waypoints = corridor_centerline(ENTRY_CORRIDOR)
-        exit_waypoints = corridor_centerline(EXIT_CORRIDOR)
-        bbox = compute_bounding_box(SURVEILLANCE_POLYGON)
-        patrol_waypoints = generate_random_waypoints(bbox, NUM_RANDOM_WAYPOINTS, RANDOM_SEED)
+    # Step 5: Build flight plan
+    entry_waypoints = corridor_centerline(ENTRY_CORRIDOR)
+    exit_waypoints = corridor_centerline(EXIT_CORRIDOR)
+    bbox = compute_bounding_box(SURVEILLANCE_POLYGON)
+    patrol_waypoints = generate_random_waypoints(bbox, NUM_RANDOM_WAYPOINTS, RANDOM_SEED)
 
-        flight_plan = entry_waypoints + patrol_waypoints + exit_waypoints
+    flight_plan = entry_waypoints + patrol_waypoints + exit_waypoints
 
-        print(f"\n[Step 5] Flight plan ({len(flight_plan)} waypoints):")
-        print(f"  Entry corridor:  {len(entry_waypoints)} wp")
-        print(f"  Patrol (random): {len(patrol_waypoints)} wp")
-        print(f"  Exit corridor:   {len(exit_waypoints)} wp")
-        for i, wp in enumerate(flight_plan):
-            print(f"    #{i:02d}: ({wp[0]:.4f}, {wp[1]:.4f})")
+    print(f"\n[Step 5] Flight plan ({len(flight_plan)} waypoints):")
+    print(f"  Entry corridor:  {len(entry_waypoints)} wp")
+    print(f"  Patrol (random): {len(patrol_waypoints)} wp")
+    print(f"  Exit corridor:   {len(exit_waypoints)} wp")
+    for i, wp in enumerate(flight_plan):
+        print(f"    #{i:02d}: ({wp[0]:.4f}, {wp[1]:.4f})")
 
-        # Step 6: Dispatch waypoints
-        print(f"\n[Step 6] Sending flight plan to '{drone_id}'...")
-        await ws.send(json.dumps({
-            "type": "follow_waypoints",
-            "waypoints": {drone_id: flight_plan},
-        }))
+    # Step 6: Set waypoints via REST API
+    print(f"\n[Step 6] Setting waypoints for '{drone_id}' via REST API...")
+    resp = requests.post(
+        f"{REST_BASE_URL}/set-waypoints",
+        json={"waypoints": {drone_id: flight_plan}},
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    for did, count in data["drones"].items():
+        print(f"  {did}: {count} waypoint(s) dispatched")
+
+    # Step 7: Monitor progress via sim-state WebSocket
+    total = len(flight_plan)
+    print(f"\n[Step 7] Monitoring via sim-state WebSocket ({total} waypoints)...\n")
+
+    async with websockets.connect(SIM_STATE_URL) as ws:
         while True:
-            msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5.0))
-            if msg["type"] == "follow_waypoints_response":
-                for did, count in msg["drones"].items():
-                    print(f"  {did}: {count} waypoint(s) dispatched")
-                break
-            elif msg["type"] == "error":
-                print(f"  Error: {msg['message']}")
-                return
-
-        # Step 7: Listen for progress
-        total = len(flight_plan)
-        reached = 0
-        print(f"\n[Step 7] Listening for waypoint events ({total} total)...\n")
-
-        while reached < total:
             try:
                 raw = await asyncio.wait_for(ws.recv(), timeout=120.0)
             except asyncio.TimeoutError:
-                print("  Timed out waiting for waypoint events.")
+                print("  Timed out waiting for state updates.")
                 break
 
-            msg = json.loads(raw)
-            if msg["type"] == "waypoint_reached":
-                reached += 1
-                did = msg.get("drone_id", "?")
-                wp = msg.get("waypoint", {})
-                idx = msg.get("index", -1)
-                phase = (
-                    "ENTRY" if reached <= len(entry_waypoints)
-                    else "EXIT" if reached > len(entry_waypoints) + len(patrol_waypoints)
-                    else "PATROL"
-                )
-                print(f"  [{reached:02d}/{total:02d}] [{phase:6s}] {did} → "
-                      f"wp#{idx} ({wp.get('lat', 0):.4f}, {wp.get('lon', 0):.4f})")
-
-        print("\nMission complete! Drone entered via corridor, patrolled, and exited.")
+            state = json.loads(raw)
+            for drone in state.get("drones", []):
+                if drone["id"] == drone_id:
+                    completed = len(drone.get("completed_waypoints", []))
+                    phase = (
+                        "ENTRY" if completed <= len(entry_waypoints)
+                        else "EXIT" if completed > len(entry_waypoints) + len(patrol_waypoints)
+                        else "PATROL"
+                    )
+                    print(f"  [{completed:02d}/{total:02d}] [{phase:6s}] "
+                          f"pos=({drone['lat']:.4f}, {drone['lon']:.4f}) | "
+                          f"{'Flying' if drone['is_flying'] else 'Idle'}")
+                    if not drone["is_flying"]:
+                        print("\nMission complete! Drone entered via corridor, patrolled, and exited.")
+                        return
 
 
 if __name__ == "__main__":
