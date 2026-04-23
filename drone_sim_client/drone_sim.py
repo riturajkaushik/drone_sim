@@ -47,7 +47,7 @@ class drone_sim:
         )
 
         # # Partition and plan the surveillance route
-        mission.partition_surveillance(length_x=100, length_y=100, overlap_percentage=20)
+        mission.partition_surveillance(length_x=300, length_y=160, overlap_percentage=20)
         surveillance_path = mission.plan_surveillance_route()
 
         corridors = self.sim_config.get("navCorridors", [])
