@@ -7,7 +7,7 @@ import matplotlib.patches as mpatches
 from matplotlib.collections import PatchCollection
 from pyproj import Transformer
 
-from rrt_star import InformedRRTStar
+from drone_sim_client.algos.rrt_star import InformedRRTStar
 
 
 class MissionPolygons:

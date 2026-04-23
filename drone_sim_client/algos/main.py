@@ -1,6 +1,6 @@
 from shapely.geometry import Polygon, Point
 
-from polygon import MissionPolygons
+from drone_sim_client.algos.polygon import MissionPolygons
 
 
 def _find_shared_point(surv_coords, nav_points, nav_exit):
