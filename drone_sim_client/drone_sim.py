@@ -103,15 +103,21 @@ class drone_sim:
             "drone-1": approach_path + surveillance_path + exit_path
         }
         
-        print(approach_path[0])
+        print("Waypoints planned: ", waypoints)
         # Spawn a drone and set its waypoints
         DRONES_TO_SPAWN = [
-            {"spawn_loc": [approach_path[0]["lat"], approach_path[0]["lon"]], "drone_id": "alpha"},
+            {"spawn_loc": [approach_path[0]["lat"], approach_path[0]["lon"]], "drone_id": "drone-1"},
         ]
 
         resp = requests.post(
             f"{self.backend_url}/spawn-drones",
             json={"drones": DRONES_TO_SPAWN},
+        )
+
+        # Set waypoints via REST API
+        resp = requests.post(
+            f"{self.backend_url}/set-waypoints",
+            json={"waypoints": waypoints},
         )
 
 
