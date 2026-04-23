@@ -1,3 +1,5 @@
+import { getMapBounds } from './coordinates.js';
+
 /**
  * WebSocket client for backend communication.
  * Gracefully degrades — frontend works without backend.
@@ -174,6 +176,43 @@ export class WSClient {
         this.ui._renderCorridorList();
         this.ui._renderCorridorEntryExitDisplay();
         console.log(`Nav corridors set: ${Object.keys(corridors).join(', ')}`);
+        break;
+      }
+
+      case 'get_sim_config': {
+        const bounds = getMapBounds();
+        const config = {
+          mapBounds: {
+            topLeft: { lat: bounds.topLeft.lat, lon: bounds.topLeft.lon },
+            bottomRight: { lat: bounds.bottomRight.lat, lon: bounds.bottomRight.lon },
+          },
+          surveillance: [],
+          surveillanceEntryPoint: null,
+          surveillanceExitPoint: null,
+          navCorridors: [],
+        };
+
+        const polyVerts = this.polygonOverlay.getVertices();
+        if (polyVerts.length > 0) {
+          config.surveillance = polyVerts;
+        }
+
+        if (this.entryExitMarkers) {
+          config.surveillanceEntryPoint = this.entryExitMarkers.getEntryPoint();
+          config.surveillanceExitPoint = this.entryExitMarkers.getExitPoint();
+        }
+
+        for (const c of this.corridorManager.getAllCorridors()) {
+          config.navCorridors.push({
+            id: c.id,
+            vertices: c.overlay.getVertices(),
+            created: c.overlay.isCreated(),
+            entryPoint: c.entryPoint ? { ...c.entryPoint } : null,
+            exitPoint: c.exitPoint ? { ...c.exitPoint } : null,
+          });
+        }
+
+        this.send({ type: 'sim_config_response', config });
         break;
       }
 

@@ -1,0 +1,114 @@
+{
+  "mapFileName": "map.png",
+  "droneFileName": "drone.png",
+  "mapBounds": {
+    "topLeft": {
+      "lat": 60.172,
+      "lon": 24.855
+    },
+    "bottomRight": {
+      "lat": 60.152,
+      "lon": 24.925
+    }
+  },
+  "captureArea": {
+    "x": 300,
+    "y": 160
+  },
+  "surveillance": [
+    {
+      "lat": 60.16,
+      "lon": 24.885
+    },
+    {
+      "lat": 60.159,
+      "lon": 24.9
+    },
+    {
+      "lat": 60.161,
+      "lon": 24.91
+    },
+    {
+      "lat": 60.167,
+      "lon": 24.908
+    },
+    {
+      "lat": 60.169,
+      "lon": 24.895
+    },
+    {
+      "lat": 60.166,
+      "lon": 24.882
+    }
+  ],
+  "surveillanceEntryPoint": {
+    "lat": 60.16,
+    "lon": 24.885
+  },
+  "surveillanceExitPoint": {
+    "lat": 60.167,
+    "lon": 24.908
+  },
+  "navCorridors": [
+    {
+      "id": "corridor-1",
+      "vertices": [
+        {
+          "lat": 60.1535,
+          "lon": 24.86
+        },
+        {
+          "lat": 60.1545,
+          "lon": 24.86
+        },
+        {
+          "lat": 60.161,
+          "lon": 24.8855
+        },
+        {
+          "lat": 60.16,
+          "lon": 24.8855
+        }
+      ],
+      "created": true,
+      "entryPoint": {
+        "lat": 60.154,
+        "lon": 24.86
+      },
+      "exitPoint": {
+        "lat": 60.1605,
+        "lon": 24.8855
+      }
+    },
+    {
+      "id": "corridor-2",
+      "vertices": [
+        {
+          "lat": 60.167,
+          "lon": 24.9075
+        },
+        {
+          "lat": 60.168,
+          "lon": 24.9075
+        },
+        {
+          "lat": 60.171,
+          "lon": 24.92
+        },
+        {
+          "lat": 60.17,
+          "lon": 24.92
+        }
+      ],
+      "created": true,
+      "entryPoint": {
+        "lat": 60.1675,
+        "lon": 24.9075
+      },
+      "exitPoint": {
+        "lat": 60.1705,
+        "lon": 24.92
+      }
+    }
+  ]
+}

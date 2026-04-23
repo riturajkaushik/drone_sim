@@ -109,6 +109,16 @@ async def root():
     return {"status": "Drone simulation backend running"}
 
 
+@app.get("/sim-config")
+async def get_sim_config():
+    """Return the current simulator configuration (map bounds, surveillance polygon, nav corridors).
+
+    If a frontend is connected, requests the live config from it.
+    Otherwise falls back to the backend's stored state.
+    """
+    return await handler.request_sim_config()
+
+
 @app.websocket("/ws/sim-state")
 async def sim_state_websocket(websocket: WebSocket):
     """WebSocket that streams the full simulation state every 500ms."""

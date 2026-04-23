@@ -1,6 +1,7 @@
 from fastapi import WebSocket
+import asyncio
 import json
-from drone_state import DroneState, Waypoint, SpawnDroneRequest, SpawnDronesRequest, FollowWaypointsRequest
+from drone_state import DroneState, Waypoint, SpawnDroneRequest, SpawnDronesRequest, FollowWaypointsRequest, LAT_MIN, LAT_MAX, LON_MIN, LON_MAX
 from pydantic import ValidationError
 
 
@@ -13,6 +14,7 @@ class DroneWSHandler:
         self.surveillance_entry_point: list[float] | None = None
         self.surveillance_exit_point: list[float] | None = None
         self.nav_corridors: dict[str, dict] | None = None
+        self._sim_config_future: asyncio.Future | None = None
         self._next_id = 1
 
     def _generate_drone_id(self) -> str:
@@ -61,6 +63,11 @@ class DroneWSHandler:
                     state.is_flying = False
                     state.current_waypoint_index = None
             print(f"Drone {drone_id} reached waypoint #{idx}: ({wp.get('lat')}, {wp.get('lon')})")
+
+        elif msg_type == "sim_config_response":
+            config = message.get("config", {})
+            if self._sim_config_future and not self._sim_config_future.done():
+                self._sim_config_future.set_result(config)
 
         elif msg_type == "follow_waypoints":
             await self._handle_follow_waypoints(ws, message)
@@ -278,6 +285,68 @@ class DroneWSHandler:
             "surveillance_exit_point": self.surveillance_exit_point,
             "nav_corridors": self.nav_corridors,
         }
+
+    def get_sim_config(self) -> dict:
+        """Build the simulator configuration snapshot (same schema as sample_sim_config.json)."""
+        # Map bounds from the authoritative constants
+        map_bounds = {
+            "topLeft": {"lat": LAT_MAX, "lon": LON_MIN},
+            "bottomRight": {"lat": LAT_MIN, "lon": LON_MAX},
+        }
+
+        # Surveillance polygon — stored as [[lat, lon], ...]
+        surveillance = self.surveillance_polygon or []
+
+        # Surveillance entry/exit — stored as [lat, lon] or None
+        surveillance_entry = None
+        if self.surveillance_entry_point and len(self.surveillance_entry_point) == 2:
+            surveillance_entry = {
+                "lat": self.surveillance_entry_point[0],
+                "lon": self.surveillance_entry_point[1],
+            }
+        surveillance_exit = None
+        if self.surveillance_exit_point and len(self.surveillance_exit_point) == 2:
+            surveillance_exit = {
+                "lat": self.surveillance_exit_point[0],
+                "lon": self.surveillance_exit_point[1],
+            }
+
+        # Nav corridors — stored as {id: {vertices, entry_point, exit_point}}
+        nav_corridors = []
+        if self.nav_corridors:
+            for corridor_id, data in self.nav_corridors.items():
+                entry_pt = data.get("entry_point")
+                exit_pt = data.get("exit_point")
+                nav_corridors.append({
+                    "id": corridor_id,
+                    "vertices": data.get("vertices", []),
+                    "entryPoint": {"lat": entry_pt[0], "lon": entry_pt[1]} if entry_pt else None,
+                    "exitPoint": {"lat": exit_pt[0], "lon": exit_pt[1]} if exit_pt else None,
+                })
+
+        return {
+            "mapBounds": map_bounds,
+            "surveillance": surveillance,
+            "surveillanceEntryPoint": surveillance_entry,
+            "surveillanceExitPoint": surveillance_exit,
+            "navCorridors": nav_corridors,
+        }
+
+    async def request_sim_config(self, timeout: float = 5.0) -> dict:
+        """Request the sim config from a connected frontend, falling back to backend state."""
+        if not self.connections:
+            return self.get_sim_config()
+
+        loop = asyncio.get_running_loop()
+        self._sim_config_future = loop.create_future()
+        await self.send_to_all({"type": "get_sim_config"})
+        try:
+            config = await asyncio.wait_for(self._sim_config_future, timeout=timeout)
+            return config
+        except asyncio.TimeoutError:
+            return self.get_sim_config()
+        finally:
+            self._sim_config_future = None
 
     async def broadcast_sim_state(self):
         """Push the current sim state to all sim-state WebSocket clients."""
