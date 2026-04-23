@@ -8,6 +8,7 @@ import { WSClient } from './wsClient.js';
 import { MAP_WIDTH, MAP_HEIGHT, updateMapConfig, resetMapConfig } from './coordinates.js';
 import { MapPicker } from './mapPicker.js';
 import { EntryExitMarkers } from './entryExitMarkers.js';
+import { CaptureOverlay } from './captureOverlay.js';
 import { saveState, restoreState, clearState } from './statePersistence.js';
 import { setDefaultDroneTexture, getDefaultDroneTexture } from './drone.js';
 import { exportConfig, importConfig } from './configIO.js';
@@ -43,6 +44,8 @@ document.getElementById('canvas-container').appendChild(renderer.domElement);
 // Create map, drone manager, polygon overlay, corridor manager, and map picker
 createMapPlane(scene);
 const manager = new DroneManager(scene);
+const captureOverlay = new CaptureOverlay(scene);
+manager.setCaptureOverlay(captureOverlay);
 const polygonOverlay = new PolygonOverlay(scene);
 const corridorManager = new NavCorridorManager(scene);
 const entryExitMarkers = new EntryExitMarkers(scene);
@@ -52,7 +55,7 @@ const mapPicker = new MapPicker(camera, renderer.domElement);
 const ui = new UI(manager, polygonOverlay, corridorManager, mapPicker, entryExitMarkers);
 
 // WebSocket client (connects in background, frontend works without it)
-const wsClient = new WSClient(manager, ui, polygonOverlay, corridorManager, entryExitMarkers);
+const wsClient = new WSClient(manager, ui, polygonOverlay, corridorManager, entryExitMarkers, captureOverlay);
 wsClient.connect();
 
 /**
@@ -97,6 +100,7 @@ function applyConfig(config, mapBlobURL, droneBlobURL) {
   polygonOverlay.remove();
   corridorManager.removeAll();
   entryExitMarkers.removeAll();
+  captureOverlay.clear();
   ui.resetAll();
   clearState();
 
@@ -110,6 +114,7 @@ function applyConfig(config, mapBlobURL, droneBlobURL) {
 
       updateMapConfig(config.mapBounds, width, height);
       replaceMapPlane(scene, mapBlobURL);
+      captureOverlay.rebuild();
       resizeCamera();
 
       // Update drone texture
@@ -230,6 +235,7 @@ document.getElementById('reset-sim-btn').addEventListener('click', async () => {
   polygonOverlay.remove();
   corridorManager.removeAll();
   entryExitMarkers.removeAll();
+  captureOverlay.clear();
   ui.resetAll();
   clearState();
 
@@ -270,6 +276,7 @@ function animate() {
 
   const dt = clock.getDelta();
   manager.updateAll(dt);
+  captureOverlay.updateTexture();
 
   // Continuously update status display
   ui.updateStatus();

@@ -63,6 +63,11 @@ export class Drone {
     this._captureWidthWorld = 0;
     this._captureHeightWorld = 0;
 
+    // Capture overlay reference (set externally by DroneManager)
+    this._captureOverlay = null;
+    this._lastStampX = null;
+    this._lastStampY = null;
+
     // Waypoint path visualization
     this._waypointDots = [];
     this._waypointLine = null;
@@ -314,6 +319,13 @@ export class Drone {
     this.scene.add(this._waypointLine);
   }
 
+  /**
+   * Set the shared capture overlay for painting scanned area dots.
+   */
+  setCaptureOverlay(overlay) {
+    this._captureOverlay = overlay;
+  }
+
   setTarget(lat, lon) {
     this.waypoints = [{ lat, lon }];
     this.currentWaypointIndex = 0;
@@ -329,6 +341,8 @@ export class Drone {
     this.currentWaypointIndex = 0;
     this.targetWorld = latLonToWorld(waypoints[0].lat, waypoints[0].lon);
     this.isFlying = true;
+    this._lastStampX = null;
+    this._lastStampY = null;
     this._buildWaypointVisuals();
     this._notifyStatusChanged();
   }
@@ -414,6 +428,31 @@ export class Drone {
 
     this._updateCaptureBoxPosition();
     this._updateWaypointLine();
+    this._stampCaptureArea();
+  }
+
+  /**
+   * Stamp dots on the capture overlay at the drone's current position.
+   * Throttled: only stamps when the drone has moved enough since the last stamp.
+   */
+  _stampCaptureArea() {
+    if (!this._captureOverlay || this._captureWidthWorld <= 0 || this._captureHeightWorld <= 0) return;
+
+    const x = this.sprite.position.x;
+    const y = this.sprite.position.y;
+
+    if (this._lastStampX !== null) {
+      const dx = x - this._lastStampX;
+      const dy = y - this._lastStampY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      // Only stamp when drone has moved at least 40% of capture area width
+      const threshold = this._captureWidthWorld * 0.4;
+      if (dist < threshold) return;
+    }
+
+    this._lastStampX = x;
+    this._lastStampY = y;
+    this._captureOverlay.stampDots(x, y, this._captureWidthWorld, this._captureHeightWorld, this.color);
   }
 
   _updateCaptureBoxPosition() {

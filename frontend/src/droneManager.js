@@ -12,6 +12,17 @@ export class DroneManager {
     this._captureWidthMeters = 0;
     this._captureHeightMeters = 0;
     this._scalePercent = 100;
+    this._captureOverlay = null;
+  }
+
+  /**
+   * Set the shared CaptureOverlay instance for scanned-area visualization.
+   */
+  setCaptureOverlay(overlay) {
+    this._captureOverlay = overlay;
+    for (const drone of this.drones.values()) {
+      drone.setCaptureOverlay(overlay);
+    }
   }
 
   /**
@@ -46,6 +57,12 @@ export class DroneManager {
     }
 
     this.drones.set(id, drone);
+
+    // Attach shared capture overlay
+    if (this._captureOverlay) {
+      drone.setCaptureOverlay(this._captureOverlay);
+    }
+
     return { drone };
   }
 
