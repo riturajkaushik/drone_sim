@@ -8,7 +8,7 @@ import matplotlib.patches as mpatches
 from matplotlib.collections import PatchCollection
 
 
-class SpacePolygon:
+class SurveillancePolygon:
     """A polygon defined by ordered GPS coordinates (lat/lon)."""
 
     def __init__(
