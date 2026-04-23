@@ -60,14 +60,12 @@ export class CaptureOverlay {
     const halfW = (captureW / MAP_WIDTH) * cw * 0.5;
     const halfH = (captureH / MAP_HEIGHT) * ch * 0.5;
 
-    const colorStr = '#' + (color & 0xffffff).toString(16).padStart(6, '0');
-
     // Dot grid parameters
-    const dotSpacing = Math.max(halfW, halfH) * 0.25; // spacing between dots
-    const dotRadius = Math.max(1.5, dotSpacing * 0.2); // dot size
+    const dotSpacing = Math.max(halfW, halfH) * 0.12; // dense spacing
+    const dotRadius = Math.max(1, dotSpacing * 0.12);  // small dots
 
-    ctx.fillStyle = colorStr;
-    ctx.globalAlpha = 0.35;
+    ctx.fillStyle = '#404040';
+    ctx.globalAlpha = 1.0;
 
     const startX = cx - halfW;
     const endX = cx + halfW;
@@ -82,7 +80,6 @@ export class CaptureOverlay {
       }
     }
 
-    ctx.globalAlpha = 1.0;
     this._dirty = true;
   }
 
