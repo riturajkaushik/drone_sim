@@ -1,5 +1,4 @@
 import copy
-import heapq
 import math
 
 from shapely.geometry import Polygon, LineString, Point
@@ -7,6 +6,8 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.collections import PatchCollection
 from pyproj import Transformer
+
+from rrt_star import InformedRRTStar
 
 
 class MissionPolygons:
@@ -110,7 +111,7 @@ class MissionPolygons:
         return list(self._nav_polygons.keys())
 
     # ------------------------------------------------------------------
-    # Nav path planning (sampled points + visibility graph + Dijkstra)
+    # Nav path planning (Informed RRT*)
     # ------------------------------------------------------------------
 
     def plan_nav_path(
@@ -120,27 +121,23 @@ class MissionPolygons:
         border_distance: float = 5.0,
         min_path_points: int = 0,
     ) -> list[dict]:
-        """Plan a smooth path from entry to exit within a nav polygon.
+        """Plan a path from entry to exit within a nav polygon using Informed RRT*.
 
-        Samples many random interior points (rejecting those too close to the
-        border), then builds a visibility graph over entry + samples + exit and
-        finds the shortest path with Dijkstra.
+        Uses the Informed RRT* algorithm which is asymptotically optimal and
+        converges efficiently in narrow/concave corridors. The path is kept at
+        least ``border_distance`` meters from the polygon boundary.
 
         Args:
             polygon_id: ID of the nav polygon to plan within.
-            num_samples: Number of random sample points to generate inside the
-                         polygon for path planning. More samples → smoother
-                         paths but slower computation.
-            border_distance: Minimum distance in meters that sampled points
-                             must be from the polygon boundary. Controls how
-                             far the path stays from edges. Automatically
+            num_samples: Maximum number of RRT* iterations. More iterations
+                         produce better paths but take longer.
+            border_distance: Minimum distance in meters that the path must
+                             maintain from the polygon boundary. Automatically
                              reduced if the polygon is too narrow.
             min_path_points: Minimum number of points in the final path
-                             (including entry and exit). If the shortest path
-                             has fewer points, intermediate points are
-                             interpolated along the path segments to reach this
-                             count. Use higher values for smoother paths.
-                             0 means no minimum (use path as-is).
+                             (including entry and exit). If the path has fewer
+                             points, intermediate points are interpolated.
+                             0 means no minimum.
 
         Returns:
             Ordered list of {"lat": float, "lon": float} waypoints from entry
@@ -160,8 +157,9 @@ class MissionPolygons:
         meters_per_deg_lon = METERS_PER_DEG_LAT * math.cos(
             math.radians(centroid.y)
         )
-        # Use average of lat/lon degree sizes as the buffer distance
-        border_deg = border_distance / ((METERS_PER_DEG_LAT + meters_per_deg_lon) / 2.0)
+        border_deg = border_distance / (
+            (METERS_PER_DEG_LAT + meters_per_deg_lon) / 2.0
+        )
 
         # Progressively shrink margin until we get a usable inner polygon
         margin = border_deg
@@ -175,49 +173,25 @@ class MissionPolygons:
         if inner_poly is None:
             inner_poly = poly
 
-        # Sample random interior points inside the inner polygon
-        import random
-        rng = random.Random(42)
+        # Auto-calculate step size from polygon dimensions
         minx, miny, maxx, maxy = poly.bounds
-        samples: list[dict] = []
-        attempts = 0
-        max_attempts = num_samples * 30
-        while len(samples) < num_samples and attempts < max_attempts:
-            attempts += 1
-            lon = rng.uniform(minx, maxx)
-            lat = rng.uniform(miny, maxy)
-            pt = Point(lon, lat)
-            if inner_poly.contains(pt):
-                samples.append({"lat": lat, "lon": lon})
+        diag = math.sqrt((maxx - minx) ** 2 + (maxy - miny) ** 2)
+        # Use a small step size relative to the polygon to navigate narrow corridors
+        step_size = diag / 50.0
+        neighbor_radius = diag / 8.0
 
-        # Build node list: entry + samples + exit
-        nodes = [entry] + samples + [exit_pt]
-        n = len(nodes)
+        planner = InformedRRTStar(
+            polygon=poly,
+            inner_polygon=inner_poly,
+            start=entry,
+            goal=exit_pt,
+            step_size=step_size,
+            neighbor_radius=neighbor_radius,
+            max_iterations=max(num_samples * 30, 3000),
+            seed=42,
+        )
 
-        # Build visibility graph.
-        # Between sample points: use inner_poly so that connecting segments
-        # also respect the border distance (not just the endpoints).
-        # For edges involving entry (0) or exit (n-1): use the original poly
-        # since they may be near the border.
-        adj: list[list[tuple[int, float]]] = [[] for _ in range(n)]
-        for i in range(n):
-            for j in range(i + 1, n):
-                is_endpoint_edge = (i == 0 or j == n - 1)
-                vis_poly = poly if is_endpoint_edge else inner_poly
-                if self._is_visible(nodes[i], nodes[j], vis_poly):
-                    d = self._coord_dist(nodes[i], nodes[j])
-                    adj[i].append((j, d))
-                    adj[j].append((i, d))
-
-        # Dijkstra from node 0 (entry) to node n-1 (exit)
-        path_indices = self._dijkstra(adj, 0, n - 1)
-
-        if path_indices is None:
-            raise RuntimeError(
-                f"No valid path found within nav polygon '{polygon_id}'."
-            )
-
-        path = [copy.deepcopy(nodes[i]) for i in path_indices]
+        path = planner.plan()
 
         # Enforce minimum path points by interpolating along segments
         if min_path_points > 0 and len(path) < min_path_points:
@@ -273,47 +247,6 @@ class MissionPolygons:
 
         return new_path
 
-    @staticmethod
-    def _is_visible(a: dict, b: dict, polygon: Polygon) -> bool:
-        """Check if the line segment from a to b lies within the polygon."""
-        line = LineString([(a["lon"], a["lat"]), (b["lon"], b["lat"])])
-        # Use a tiny negative buffer to handle floating-point edge cases
-        return polygon.buffer(1e-10).contains(line)
-
-    @staticmethod
-    def _dijkstra(
-        adj: list[list[tuple[int, float]]], start: int, end: int
-    ) -> list[int] | None:
-        """Shortest path via Dijkstra. Returns list of node indices or None."""
-        n = len(adj)
-        dist = [float("inf")] * n
-        prev = [-1] * n
-        dist[start] = 0.0
-        heap = [(0.0, start)]
-
-        while heap:
-            d, u = heapq.heappop(heap)
-            if d > dist[u]:
-                continue
-            if u == end:
-                break
-            for v, w in adj[u]:
-                nd = d + w
-                if nd < dist[v]:
-                    dist[v] = nd
-                    prev[v] = u
-                    heapq.heappush(heap, (nd, v))
-
-        if dist[end] == float("inf"):
-            return None
-
-        path = []
-        cur = end
-        while cur != -1:
-            path.append(cur)
-            cur = prev[cur]
-        path.reverse()
-        return path
 
     # ------------------------------------------------------------------
     # Surveillance polygon: partitioning
