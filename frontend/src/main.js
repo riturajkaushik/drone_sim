@@ -6,6 +6,7 @@ import { NavCorridorManager } from './navCorridorManager.js';
 import { UI } from './ui.js';
 import { WSClient } from './wsClient.js';
 import { MAP_WIDTH, MAP_HEIGHT } from './coordinates.js';
+import { MapPicker } from './mapPicker.js';
 import { saveState, restoreState, clearState } from './statePersistence.js';
 
 // Scene setup
@@ -31,14 +32,15 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
 document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-// Create map, drone manager, polygon overlay, and corridor manager
+// Create map, drone manager, polygon overlay, corridor manager, and map picker
 createMapPlane(scene);
 const manager = new DroneManager(scene);
 const polygonOverlay = new PolygonOverlay(scene);
 const corridorManager = new NavCorridorManager(scene);
+const mapPicker = new MapPicker(camera, renderer.domElement);
 
 // UI
-const ui = new UI(manager, polygonOverlay, corridorManager);
+const ui = new UI(manager, polygonOverlay, corridorManager, mapPicker);
 
 // WebSocket client (connects in background, frontend works without it)
 const wsClient = new WSClient(manager, ui, polygonOverlay, corridorManager);

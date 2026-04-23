@@ -18,6 +18,8 @@
 
 [x] Create rest api end point to create the nav corridors. The payload is a lost of polygons ["corridor_0": [[lat, lon], ...], "corridor_2": [[lat, lon], ...]]. Implement proper pydantic schema and implement example script. It should set a surveillance polygon, set two nav corridors to reach and exit the surveillance area and spawn one drop and follow a random waypoints list
 
-[ ] Make drone spawning a REST api endpoint in the backend for the client. Accordingly, Update the examples scripts
+[x] Make drone spawning a REST api endpoint in the backend for the client. Accordingly, Update the examples scripts
 
-[x] Implement set waypoints as REST API endpoint (`POST /set-waypoints`). Implement sim state WebSocket (`/ws/sim-state`) streaming drone locations, waypoints (completed/pending), velocities, surveillance area, and nav corridors. Updated example scripts to use REST for waypoints and sim-state WS for monitoring. 
+[x] Implement set waypoints as REST API endpoint (`POST /set-waypoints`). Implement sim state WebSocket (`/ws/sim-state`) streaming drone locations, waypoints (completed/pending), velocities, surveillance area, and nav corridors. Updated example scripts to use REST for waypoints and sim-state WS for monitoring.
+
+[ ] In the frontend, for the nv corridors and surveillance polygon, add option to create the polygons using mouse. Simply add a droppers to seletect the lat long by clicking a point on the map. The moment  click a point on the map with the dropper, it should be added to the polygon without even clicking the add button. Also, when we move on the map with the dropper, the lat lon should be shown near the dropper so that we know the lat lon even before clicking the point. 

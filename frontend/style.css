@@ -471,3 +471,39 @@ select:focus {
 #remove-corridor-btn:hover {
   background: #666;
 }
+
+/* Map picker / dropper */
+.pick-btn {
+  padding: 5px 10px;
+  font-size: 12px;
+  background: #555;
+  white-space: nowrap;
+}
+
+.pick-btn:hover {
+  background: #666;
+}
+
+.pick-btn.active {
+  background: #e09020;
+  color: #fff;
+}
+
+.pick-btn.active:hover {
+  background: #c07818;
+}
+
+#picker-tooltip {
+  display: none;
+  position: fixed;
+  padding: 3px 8px;
+  background: rgba(0, 0, 0, 0.82);
+  color: #fff;
+  font-size: 12px;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 200;
+  white-space: nowrap;
+}

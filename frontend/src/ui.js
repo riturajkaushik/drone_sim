@@ -3,10 +3,11 @@
  * Works standalone without backend.
  */
 export class UI {
-  constructor(manager, polygonOverlay, corridorManager) {
+  constructor(manager, polygonOverlay, corridorManager, mapPicker) {
     this.manager = manager;
     this.polygonOverlay = polygonOverlay;
     this.corridorManager = corridorManager;
+    this.mapPicker = mapPicker;
     this.waypointQueues = new Map(); // droneId → [{lat, lon}, ...]
 
     // Capture Area
@@ -62,6 +63,10 @@ export class UI {
     this.removeCorridorBtn = document.getElementById('remove-corridor-btn');
     this.corridorPointList = document.getElementById('corridor-point-list');
     this.corridorList = document.getElementById('corridor-list');
+
+    // Picker buttons
+    this.polyPickBtn = document.getElementById('poly-pick-btn');
+    this.corridorPickBtn = document.getElementById('corridor-pick-btn');
 
     // Status
     this.statusDisplay = document.getElementById('status-display');
@@ -185,6 +190,7 @@ export class UI {
     this.createPolyBtn.addEventListener('click', () => {
       this.polygonOverlay.create();
       this._updatePolyButtons();
+      if (this._activePickerMode === 'polygon') this.mapPicker.deactivate();
     });
 
     // Polygon: remove
@@ -192,6 +198,7 @@ export class UI {
       this.polygonOverlay.remove();
       this._renderPolygonPointList();
       this._updatePolyButtons();
+      if (this._activePickerMode === 'polygon') this.mapPicker.deactivate();
     });
 
     // Nav Corridors: new corridor
@@ -231,6 +238,7 @@ export class UI {
       entry.overlay.create();
       this._renderCorridorList();
       this._updateCorridorButtons();
+      if (this._activePickerMode === 'corridor') this.mapPicker.deactivate();
     });
 
     // Nav Corridors: remove selected corridor
@@ -242,6 +250,49 @@ export class UI {
       this._renderCorridorList();
       this._renderCorridorPointList();
       this._updateCorridorButtons();
+      if (this._activePickerMode === 'corridor') this.mapPicker.deactivate();
+    });
+
+    // Picker: surveillance polygon
+    this.polyPickBtn.addEventListener('click', () => {
+      if (this.mapPicker.isActive() && this._activePickerMode === 'polygon') {
+        this.mapPicker.deactivate();
+        return;
+      }
+      this._activePickerMode = 'polygon';
+      this._setPickerButtonStates(this.polyPickBtn);
+      this.mapPicker.activate(
+        (lat, lon) => {
+          this.polygonOverlay.addVertex(lat, lon);
+          this._renderPolygonPointList();
+          this._updatePolyButtons();
+        },
+        () => this._clearPickerButtonStates()
+      );
+    });
+
+    // Picker: nav corridor
+    this.corridorPickBtn.addEventListener('click', () => {
+      if (this.mapPicker.isActive() && this._activePickerMode === 'corridor') {
+        this.mapPicker.deactivate();
+        return;
+      }
+      const id = this.corridorSelect.value;
+      const entry = this.corridorManager.getCorridor(id);
+      if (!entry) return;
+      this._activePickerMode = 'corridor';
+      this._setPickerButtonStates(this.corridorPickBtn);
+      this.mapPicker.activate(
+        (lat, lon) => {
+          const currentId = this.corridorSelect.value;
+          const currentEntry = this.corridorManager.getCorridor(currentId);
+          if (!currentEntry) return;
+          currentEntry.overlay.addVertex(lat, lon);
+          this._renderCorridorPointList();
+          this._updateCorridorButtons();
+        },
+        () => this._clearPickerButtonStates()
+      );
     });
   }
 
@@ -461,5 +512,19 @@ export class UI {
     this.addCorridorPointBtn.disabled = false;
     const count = entry.overlay.getVertices().length;
     this.createCorridorBtn.disabled = count < 3 || entry.overlay.isCreated();
+  }
+
+  // --- Picker button helpers ---
+
+  _setPickerButtonStates(activeBtn) {
+    this.polyPickBtn.classList.remove('active');
+    this.corridorPickBtn.classList.remove('active');
+    activeBtn.classList.add('active');
+  }
+
+  _clearPickerButtonStates() {
+    this.polyPickBtn.classList.remove('active');
+    this.corridorPickBtn.classList.remove('active');
+    this._activePickerMode = null;
   }
 }
