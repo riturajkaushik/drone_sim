@@ -84,6 +84,21 @@ class drone_sim:
             min_path_points=MIN_PATH_POINTS,
         )
 
+        mission.add_nav_polygon(
+                polygon_id="exit",
+                points=exit_corridor.get("vertices", []),
+                entry_point=exit_corridor.get("entryPoint"),
+                exit_point=exit_corridor.get("exitPoint"),
+            )
+        mission.plan_nav_path(
+            "exit",
+            num_samples=NUM_SAMPLES,
+            border_distance=BORDER_DISTANCE,
+            min_path_points=MIN_PATH_POINTS,
+        )
+
+        mission.render()
+
 if __name__ == "__main__":
     sim = drone_sim()
     sim.plan_path()
