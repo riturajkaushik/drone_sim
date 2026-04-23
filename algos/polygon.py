@@ -110,18 +110,37 @@ class MissionPolygons:
         return list(self._nav_polygons.keys())
 
     # ------------------------------------------------------------------
-    # Nav path planning (visibility graph + Dijkstra)
+    # Nav path planning (sampled points + visibility graph + Dijkstra)
     # ------------------------------------------------------------------
 
-    def plan_nav_path(self, polygon_id: str) -> list[dict]:
-        """Plan a path from entry to exit within a nav polygon.
+    def plan_nav_path(
+        self,
+        polygon_id: str,
+        num_samples: int = 300,
+        border_distance: float = 5.0,
+        min_path_points: int = 0,
+    ) -> list[dict]:
+        """Plan a smooth path from entry to exit within a nav polygon.
 
-        Uses a visibility graph approach: builds a graph from entry, exit, and
-        all polygon vertices, connecting pairs that have direct line-of-sight
-        within the polygon. Shortest path found via Dijkstra.
+        Samples many random interior points (rejecting those too close to the
+        border), then builds a visibility graph over entry + samples + exit and
+        finds the shortest path with Dijkstra.
 
         Args:
             polygon_id: ID of the nav polygon to plan within.
+            num_samples: Number of random sample points to generate inside the
+                         polygon for path planning. More samples → smoother
+                         paths but slower computation.
+            border_distance: Minimum distance in meters that sampled points
+                             must be from the polygon boundary. Controls how
+                             far the path stays from edges. Automatically
+                             reduced if the polygon is too narrow.
+            min_path_points: Minimum number of points in the final path
+                             (including entry and exit). If the shortest path
+                             has fewer points, intermediate points are
+                             interpolated along the path segments to reach this
+                             count. Use higher values for smoother paths.
+                             0 means no minimum (use path as-is).
 
         Returns:
             Ordered list of {"lat": float, "lon": float} waypoints from entry
@@ -134,17 +153,58 @@ class MissionPolygons:
         poly = nav["shapely"]
         entry = nav["entry_point"]
         exit_pt = nav["exit_point"]
-        vertices = nav["points"]
 
-        # Build node list: entry + polygon vertices + exit
-        nodes = [entry] + list(vertices) + [exit_pt]
+        # Convert border_distance from meters to degrees
+        METERS_PER_DEG_LAT = 111_320.0
+        centroid = poly.centroid
+        meters_per_deg_lon = METERS_PER_DEG_LAT * math.cos(
+            math.radians(centroid.y)
+        )
+        # Use average of lat/lon degree sizes as the buffer distance
+        border_deg = border_distance / ((METERS_PER_DEG_LAT + meters_per_deg_lon) / 2.0)
+
+        # Progressively shrink margin until we get a usable inner polygon
+        margin = border_deg
+        inner_poly = None
+        while margin > border_deg * 0.1:
+            candidate = poly.buffer(-margin)
+            if not candidate.is_empty and candidate.area > 0:
+                inner_poly = candidate
+                break
+            margin *= 0.5
+        if inner_poly is None:
+            inner_poly = poly
+
+        # Sample random interior points inside the inner polygon
+        import random
+        rng = random.Random(42)
+        minx, miny, maxx, maxy = poly.bounds
+        samples: list[dict] = []
+        attempts = 0
+        max_attempts = num_samples * 30
+        while len(samples) < num_samples and attempts < max_attempts:
+            attempts += 1
+            lon = rng.uniform(minx, maxx)
+            lat = rng.uniform(miny, maxy)
+            pt = Point(lon, lat)
+            if inner_poly.contains(pt):
+                samples.append({"lat": lat, "lon": lon})
+
+        # Build node list: entry + samples + exit
+        nodes = [entry] + samples + [exit_pt]
         n = len(nodes)
 
-        # Build adjacency list using visibility checks
+        # Build visibility graph.
+        # Between sample points: use inner_poly so that connecting segments
+        # also respect the border distance (not just the endpoints).
+        # For edges involving entry (0) or exit (n-1): use the original poly
+        # since they may be near the border.
         adj: list[list[tuple[int, float]]] = [[] for _ in range(n)]
         for i in range(n):
             for j in range(i + 1, n):
-                if self._is_visible(nodes[i], nodes[j], poly):
+                is_endpoint_edge = (i == 0 or j == n - 1)
+                vis_poly = poly if is_endpoint_edge else inner_poly
+                if self._is_visible(nodes[i], nodes[j], vis_poly):
                     d = self._coord_dist(nodes[i], nodes[j])
                     adj[i].append((j, d))
                     adj[j].append((i, d))
@@ -158,8 +218,60 @@ class MissionPolygons:
             )
 
         path = [copy.deepcopy(nodes[i]) for i in path_indices]
+
+        # Enforce minimum path points by interpolating along segments
+        if min_path_points > 0 and len(path) < min_path_points:
+            path = self._interpolate_path(path, min_path_points)
+
         nav["path"] = path
         return copy.deepcopy(path)
+
+    @staticmethod
+    def _interpolate_path(
+        path: list[dict], min_points: int
+    ) -> list[dict]:
+        """Add evenly-spaced intermediate points along a path.
+
+        Points are distributed proportionally to segment length so that the
+        overall spacing is uniform. The first and last segments (touching
+        entry/exit) are not subdivided to avoid placing points near the
+        polygon border.
+        """
+        if len(path) < 2 or min_points <= len(path):
+            return path
+
+        # Segments eligible for subdivision (skip first and last)
+        seg_lengths = []
+        for i in range(len(path) - 1):
+            dlat = path[i + 1]["lat"] - path[i]["lat"]
+            dlon = path[i + 1]["lon"] - path[i]["lon"]
+            seg_lengths.append(math.sqrt(dlat * dlat + dlon * dlon))
+
+        # Only subdivide interior segments (indices 1..n-2)
+        interior_start = 1 if len(path) > 2 else 0
+        interior_end = len(seg_lengths) - 1 if len(path) > 2 else len(seg_lengths)
+        interior_total = sum(seg_lengths[interior_start:interior_end])
+
+        if interior_total < 1e-15 or interior_start >= interior_end:
+            return path
+
+        points_to_add = min_points - len(path)
+
+        new_path: list[dict] = [path[0]]
+        for seg_idx in range(len(seg_lengths)):
+            if interior_start <= seg_idx < interior_end and points_to_add > 0:
+                seg_share = seg_lengths[seg_idx] / interior_total
+                seg_new = max(0, round(seg_share * points_to_add))
+
+                for k in range(1, seg_new + 1):
+                    t = k / (seg_new + 1)
+                    new_path.append({
+                        "lat": path[seg_idx]["lat"] + t * (path[seg_idx + 1]["lat"] - path[seg_idx]["lat"]),
+                        "lon": path[seg_idx]["lon"] + t * (path[seg_idx + 1]["lon"] - path[seg_idx]["lon"]),
+                    })
+            new_path.append(path[seg_idx + 1])
+
+        return new_path
 
     @staticmethod
     def _is_visible(a: dict, b: dict, polygon: Polygon) -> bool:
@@ -609,3 +721,12 @@ class MissionPolygons:
                     color=color, linewidth=1.5, linestyle="--",
                     zorder=5, label=f"Nav path: {pid}",
                 )
+                # Cross markers for intermediate waypoints (exclude entry/exit)
+                intermediate = nav["path"][1:-1]
+                if intermediate:
+                    ax.scatter(
+                        [p["lon"] for p in intermediate],
+                        [p["lat"] for p in intermediate],
+                        color=color, marker="x", s=50, zorder=8,
+                        linewidths=1.5, label=f"Nav waypoints: {pid}",
+                    )

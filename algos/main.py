@@ -58,7 +58,17 @@ def main():
         entry_point={"lat": 60.1640, "lon": 24.8565},
         exit_point={"lat": 60.1635, "lon": 24.8738},
     )
-    mission.plan_nav_path("approach")
+    # Nav path planning settings
+    NUM_SAMPLES = 100        # random sample points for path planning
+    BORDER_DISTANCE = 50.0   # min distance from polygon edges in meters
+    MIN_PATH_POINTS = 10     # minimum waypoints in the path for smoothness
+
+    mission.plan_nav_path(
+        "approach",
+        num_samples=NUM_SAMPLES,
+        border_distance=BORDER_DISTANCE,
+        min_path_points=MIN_PATH_POINTS,
+    )
 
     mission.render()
 
