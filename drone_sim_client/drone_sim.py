@@ -9,7 +9,7 @@ import sys
 BACKEND_URL = "http://localhost:8000"
 
 class drone_sim:
-    def __init__(self, backend_url=BACKEND_URL, approach_cooridor_id="corridor_1", exit_corridor_id="corridor_2"):
+    def __init__(self, backend_url=BACKEND_URL, approach_cooridor_id="corridor-1", exit_corridor_id="corridor-2"):
         self.backend_url = backend_url.rstrip("/")
         self.approach_cooridor_id = approach_cooridor_id
         self.exit_corridor_id = exit_corridor_id
@@ -47,8 +47,8 @@ class drone_sim:
         )
 
         # # Partition and plan the surveillance route
-        # mission.partition_surveillance(length_x=100, length_y=100, overlap_percentage=20)
-        # mission.plan_surveillance_route()
+        mission.partition_surveillance(length_x=100, length_y=100, overlap_percentage=20)
+        mission.plan_surveillance_route()
 
         corridors = self.sim_config.get("navCorridors", [])
         approach_corridor = None
@@ -57,14 +57,33 @@ class drone_sim:
         for c in corridors:
             if c.get("id") == self.approach_cooridor_id:
                 approach_corridor = c
+                assert approach_corridor.get("entryPoint") and approach_corridor.get("exitPoint"), "Approach corridor must have entry and exit points defined."
             elif c.get("id") == self.exit_corridor_id:
                 exit_corridor = c
+                assert exit_corridor.get("entryPoint") and exit_corridor.get("exitPoint"), "Exit corridor must have entry and exit points defined."
         
         if not approach_corridor or not exit_corridor:
             print("Approach or exit corridor not defined in config.")
             sys.exit(1)
 
-        
+        mission.add_nav_polygon(
+                polygon_id="approach",
+                points=approach_corridor.get("vertices", []),
+                entry_point=approach_corridor.get("entryPoint"),
+                exit_point=approach_corridor.get("exitPoint"),
+            )
+        # Nav path planning settings
+        NUM_SAMPLES = 100        # random sample points for path planning
+        BORDER_DISTANCE = 50.0   # min distance from polygon edges in meters
+        MIN_PATH_POINTS = 10     # minimum waypoints in the path for smoothness
+
+        mission.plan_nav_path(
+            "approach",
+            num_samples=NUM_SAMPLES,
+            border_distance=BORDER_DISTANCE,
+            min_path_points=MIN_PATH_POINTS,
+        )
 
 if __name__ == "__main__":
     sim = drone_sim()
+    sim.plan_path()
