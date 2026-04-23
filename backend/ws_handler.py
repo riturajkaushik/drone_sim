@@ -10,7 +10,7 @@ class DroneWSHandler:
         self.sim_state_connections: list[WebSocket] = []
         self.drones: dict[str, DroneState] = {}
         self.surveillance_polygon: list[list[float]] | None = None
-        self.nav_corridors: dict[str, list[list[float]]] | None = None
+        self.nav_corridors: dict[str, dict] | None = None
         self.entry_point: list[float] | None = None
         self.exit_point: list[float] | None = None
         self._next_id = 1

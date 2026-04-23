@@ -33,6 +33,8 @@ function buildConfigJSON(manager, polygonOverlay, corridorManager, entryExitMark
       id: c.id,
       vertices: c.overlay.getVertices(),
       created: c.overlay.isCreated(),
+      entryPoint: c.entryPoint ? { ...c.entryPoint } : null,
+      exitPoint: c.exitPoint ? { ...c.exitPoint } : null,
     });
   }
 

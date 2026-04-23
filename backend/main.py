@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 import asyncio
 import json
 from ws_handler import DroneWSHandler
-from drone_state import SurveillancePolygonRequest, NavCorridorsRequest, SpawnDronesRequest, FollowWaypointsRequest, EntryExitPointsRequest
+from drone_state import SurveillancePolygonRequest, NavCorridorsRequest, NavCorridorData, SpawnDronesRequest, FollowWaypointsRequest, EntryExitPointsRequest
 
 app = FastAPI(title="Drone Simulation Backend")
 
@@ -52,17 +52,21 @@ async def set_surveillance_polygon(req: SurveillancePolygonRequest):
 @app.post("/nav-corridors")
 async def set_nav_corridors(req: NavCorridorsRequest):
     """Store navigation corridors and broadcast them to all connected frontends."""
-    handler.nav_corridors = req.nav_corridors
+    # Store the full NavCorridorData objects
+    handler.nav_corridors = {
+        cid: data.model_dump() for cid, data in req.nav_corridors.items()
+    }
+    # Broadcast in new format: {corridorId: {vertices, entry_point, exit_point}}
     await handler.send_to_all({
         "type": "set_nav_corridors",
-        "nav_corridors": req.nav_corridors,
+        "nav_corridors": handler.nav_corridors,
     })
     return {
         "status": "ok",
         "corridors": {
-            cid: len(verts) for cid, verts in req.nav_corridors.items()
+            cid: len(data.vertices) for cid, data in req.nav_corridors.items()
         },
-        "nav_corridors": req.nav_corridors,
+        "nav_corridors": handler.nav_corridors,
     }
 
 

@@ -71,38 +71,65 @@ class SurveillancePolygonRequest(BaseModel):
         return v
 
 
+class NavCorridorData(BaseModel):
+    """Data for a single navigation corridor: vertices + optional entry/exit points."""
+    vertices: list[list[float]]
+    entry_point: Optional[list[float]] = None
+    exit_point: Optional[list[float]] = None
+
+    @field_validator("vertices")
+    @classmethod
+    def validate_vertices(cls, v: list[list[float]]) -> list[list[float]]:
+        if len(v) < 3:
+            raise ValueError(f"Requires at least 3 vertices, got {len(v)}")
+        for i, coord in enumerate(v):
+            if len(coord) != 2:
+                raise ValueError(f"Vertex {i}: expected [lat, lon], got {coord}")
+            lat, lon = coord
+            if not (LAT_MIN <= lat <= LAT_MAX):
+                raise ValueError(f"Vertex {i}: lat {lat} out of bounds [{LAT_MIN}, {LAT_MAX}]")
+            if not (LON_MIN <= lon <= LON_MAX):
+                raise ValueError(f"Vertex {i}: lon {lon} out of bounds [{LON_MIN}, {LON_MAX}]")
+        return v
+
+    @field_validator("entry_point", "exit_point")
+    @classmethod
+    def validate_optional_point(cls, v: Optional[list[float]], info) -> Optional[list[float]]:
+        if v is None:
+            return v
+        if len(v) != 2:
+            raise ValueError(f"{info.field_name} must be [lat, lon]")
+        lat, lon = v
+        if not (LAT_MIN <= lat <= LAT_MAX):
+            raise ValueError(f"{info.field_name}: lat {lat} out of bounds [{LAT_MIN}, {LAT_MAX}]")
+        if not (LON_MIN <= lon <= LON_MAX):
+            raise ValueError(f"{info.field_name}: lon {lon} out of bounds [{LON_MIN}, {LON_MAX}]")
+        return v
+
+
 class NavCorridorsRequest(BaseModel):
     """Validates the payload for the POST /nav-corridors endpoint.
-    nav_corridors: {"corridor_0": [[lat, lon], ...], "corridor_1": [[lat, lon], ...], ...}
-    Each corridor is an ordered list of vertices forming a polygon (at least 3 vertices).
+
+    Accepts two formats:
+      New: {"nav_corridors": {"id": {"vertices": [...], "entry_point": [...], "exit_point": [...]}, ...}}
+      Legacy: {"nav_corridors": {"id": [[lat, lon], ...], ...}}
     """
-    nav_corridors: dict[str, list[list[float]]]
+    nav_corridors: dict[str, NavCorridorData | list[list[float]]]
 
     @field_validator("nav_corridors")
     @classmethod
-    def validate_nav_corridors(cls, v: dict[str, list[list[float]]]) -> dict[str, list[list[float]]]:
+    def normalize_nav_corridors(cls, v):
         if not v:
             raise ValueError("nav_corridors must contain at least one corridor")
-        for corridor_id, vertices in v.items():
-            if len(vertices) < 3:
-                raise ValueError(
-                    f"Corridor '{corridor_id}': requires at least 3 vertices, got {len(vertices)}"
-                )
-            for i, coord in enumerate(vertices):
-                if len(coord) != 2:
-                    raise ValueError(
-                        f"Corridor '{corridor_id}', vertex {i}: expected [lat, lon], got {coord}"
-                    )
-                lat, lon = coord
-                if not (LAT_MIN <= lat <= LAT_MAX):
-                    raise ValueError(
-                        f"Corridor '{corridor_id}', vertex {i}: lat {lat} out of bounds [{LAT_MIN}, {LAT_MAX}]"
-                    )
-                if not (LON_MIN <= lon <= LON_MAX):
-                    raise ValueError(
-                        f"Corridor '{corridor_id}', vertex {i}: lon {lon} out of bounds [{LON_MIN}, {LON_MAX}]"
-                    )
-        return v
+        normalized = {}
+        for corridor_id, data in v.items():
+            if isinstance(data, NavCorridorData):
+                normalized[corridor_id] = data
+            elif isinstance(data, list):
+                normalized[corridor_id] = NavCorridorData(vertices=data)
+            else:
+                raise ValueError(f"Corridor '{corridor_id}': invalid format")
+        return normalized
 
 
 class EntryExitPointsRequest(BaseModel):

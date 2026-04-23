@@ -65,6 +65,18 @@ export class UI {
     this.corridorPointList = document.getElementById('corridor-point-list');
     this.corridorList = document.getElementById('corridor-list');
 
+    // Nav Corridor Entry/Exit
+    this.corridorEntryLatInput = document.getElementById('corridor-entry-lat');
+    this.corridorEntryLonInput = document.getElementById('corridor-entry-lon');
+    this.setCorridorEntryBtn = document.getElementById('set-corridor-entry-btn');
+    this.corridorEntryPickBtn = document.getElementById('corridor-entry-pick-btn');
+    this.corridorExitLatInput = document.getElementById('corridor-exit-lat');
+    this.corridorExitLonInput = document.getElementById('corridor-exit-lon');
+    this.setCorridorExitBtn = document.getElementById('set-corridor-exit-btn');
+    this.corridorExitPickBtn = document.getElementById('corridor-exit-pick-btn');
+    this.corridorEntryExitDisplay = document.getElementById('corridor-entry-exit-display');
+    this.clearCorridorEntryExitBtn = document.getElementById('clear-corridor-entry-exit-btn');
+
     // Picker buttons
     this.polyPickBtn = document.getElementById('poly-pick-btn');
     this.corridorPickBtn = document.getElementById('corridor-pick-btn');
@@ -227,6 +239,7 @@ export class UI {
     this.corridorSelect.addEventListener('change', () => {
       this._renderCorridorPointList();
       this._updateCorridorButtons();
+      this._renderCorridorEntryExitDisplay();
     });
 
     // Nav Corridors: add point
@@ -263,7 +276,91 @@ export class UI {
       this._renderCorridorList();
       this._renderCorridorPointList();
       this._updateCorridorButtons();
+      this._renderCorridorEntryExitDisplay();
       if (this._activePickerMode === 'corridor') this.mapPicker.deactivate();
+    });
+
+    // Nav Corridor: set entry point
+    this.setCorridorEntryBtn.addEventListener('click', () => {
+      const id = this.corridorSelect.value;
+      if (!id) return;
+      const lat = parseFloat(this.corridorEntryLatInput.value);
+      const lon = parseFloat(this.corridorEntryLonInput.value);
+      if (!isNaN(lat) && !isNaN(lon)) {
+        this.corridorManager.setCorridorEntryPoint(id, lat, lon);
+        this._renderCorridorEntryExitDisplay();
+      }
+    });
+
+    // Nav Corridor: set exit point
+    this.setCorridorExitBtn.addEventListener('click', () => {
+      const id = this.corridorSelect.value;
+      if (!id) return;
+      const lat = parseFloat(this.corridorExitLatInput.value);
+      const lon = parseFloat(this.corridorExitLonInput.value);
+      if (!isNaN(lat) && !isNaN(lon)) {
+        this.corridorManager.setCorridorExitPoint(id, lat, lon);
+        this._renderCorridorEntryExitDisplay();
+      }
+    });
+
+    // Nav Corridor: clear entry/exit points
+    this.clearCorridorEntryExitBtn.addEventListener('click', () => {
+      const id = this.corridorSelect.value;
+      if (!id) return;
+      this.corridorManager.clearCorridorEntryExit(id);
+      this._renderCorridorEntryExitDisplay();
+      if (this._activePickerMode === 'corridor-entry' || this._activePickerMode === 'corridor-exit') {
+        this.mapPicker.deactivate();
+      }
+    });
+
+    // Picker: corridor entry point
+    this.corridorEntryPickBtn.addEventListener('click', () => {
+      if (this.mapPicker.isActive() && this._activePickerMode === 'corridor-entry') {
+        this.mapPicker.deactivate();
+        return;
+      }
+      const id = this.corridorSelect.value;
+      if (!id) return;
+      this._activePickerMode = 'corridor-entry';
+      this._setPickerButtonStates(this.corridorEntryPickBtn);
+      this.mapPicker.activate(
+        (lat, lon) => {
+          const currentId = this.corridorSelect.value;
+          if (!currentId) return;
+          this.corridorEntryLatInput.value = lat.toFixed(4);
+          this.corridorEntryLonInput.value = lon.toFixed(4);
+          this.corridorManager.setCorridorEntryPoint(currentId, lat, lon);
+          this._renderCorridorEntryExitDisplay();
+          this.mapPicker.deactivate();
+        },
+        () => this._clearPickerButtonStates()
+      );
+    });
+
+    // Picker: corridor exit point
+    this.corridorExitPickBtn.addEventListener('click', () => {
+      if (this.mapPicker.isActive() && this._activePickerMode === 'corridor-exit') {
+        this.mapPicker.deactivate();
+        return;
+      }
+      const id = this.corridorSelect.value;
+      if (!id) return;
+      this._activePickerMode = 'corridor-exit';
+      this._setPickerButtonStates(this.corridorExitPickBtn);
+      this.mapPicker.activate(
+        (lat, lon) => {
+          const currentId = this.corridorSelect.value;
+          if (!currentId) return;
+          this.corridorExitLatInput.value = lat.toFixed(4);
+          this.corridorExitLonInput.value = lon.toFixed(4);
+          this.corridorManager.setCorridorExitPoint(currentId, lat, lon);
+          this._renderCorridorEntryExitDisplay();
+          this.mapPicker.deactivate();
+        },
+        () => this._clearPickerButtonStates()
+      );
     });
 
     // Picker: surveillance polygon
@@ -497,6 +594,7 @@ export class UI {
     this._renderCorridorList();
     this._renderCorridorPointList();
     this._updateCorridorButtons();
+    this._renderCorridorEntryExitDisplay();
     this._renderEntryExitDisplay();
   }
 
@@ -511,6 +609,20 @@ export class UI {
       html += `<div><span class="exit-label">● Exit:</span> ${exit.lat.toFixed(4)}, ${exit.lon.toFixed(4)}</div>`;
     }
     this.entryExitDisplay.innerHTML = html;
+  }
+
+  _renderCorridorEntryExitDisplay() {
+    const id = this.corridorSelect.value;
+    const entry = id ? this.corridorManager.getCorridorEntryPoint(id) : null;
+    const exit = id ? this.corridorManager.getCorridorExitPoint(id) : null;
+    let html = '';
+    if (entry) {
+      html += `<div><span class="entry-label" style="color:#11bbaa">● Entry:</span> ${entry.lat.toFixed(4)}, ${entry.lon.toFixed(4)}</div>`;
+    }
+    if (exit) {
+      html += `<div><span class="exit-label" style="color:#dd7722">● Exit:</span> ${exit.lat.toFixed(4)}, ${exit.lon.toFixed(4)}</div>`;
+    }
+    this.corridorEntryExitDisplay.innerHTML = html;
   }
 
   _renderPolygonPointList() {
@@ -617,6 +729,8 @@ export class UI {
     this.corridorPickBtn.classList.remove('active');
     this.entryPickBtn.classList.remove('active');
     this.exitPickBtn.classList.remove('active');
+    this.corridorEntryPickBtn.classList.remove('active');
+    this.corridorExitPickBtn.classList.remove('active');
     activeBtn.classList.add('active');
   }
 
@@ -625,6 +739,8 @@ export class UI {
     this.corridorPickBtn.classList.remove('active');
     this.entryPickBtn.classList.remove('active');
     this.exitPickBtn.classList.remove('active');
+    this.corridorEntryPickBtn.classList.remove('active');
+    this.corridorExitPickBtn.classList.remove('active');
     this._activePickerMode = null;
   }
 }

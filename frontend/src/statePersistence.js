@@ -137,6 +137,7 @@ export function restoreState(manager, ui, polygonOverlay, corridorManager, entry
     ui._renderCorridorList();
     ui._renderCorridorPointList();
     ui._updateCorridorButtons();
+    ui._renderCorridorEntryExitDisplay();
   }
 
   // Restore entry/exit points

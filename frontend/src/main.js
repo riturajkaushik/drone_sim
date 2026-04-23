@@ -136,7 +136,7 @@ function applyConfig(config, mapBlobURL, droneBlobURL) {
         ui._updatePolyButtons();
       }
 
-      // Restore nav corridors
+      // Restore nav corridors (restoreFromState handles entryPoint/exitPoint)
       if (config.navCorridors && config.navCorridors.length > 0) {
         corridorManager.restoreFromState({
           corridors: config.navCorridors,
@@ -146,6 +146,7 @@ function applyConfig(config, mapBlobURL, droneBlobURL) {
         ui._renderCorridorList();
         ui._renderCorridorPointList();
         ui._updateCorridorButtons();
+        ui._renderCorridorEntryExitDisplay();
       }
 
       // Restore entry/exit points

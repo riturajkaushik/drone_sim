@@ -135,15 +135,33 @@ export class WSClient {
       case 'set_nav_corridors': {
         const corridors = message.nav_corridors || {};
         this.corridorManager.removeAll();
-        for (const [corridorId, vertices] of Object.entries(corridors)) {
+        for (const [corridorId, data] of Object.entries(corridors)) {
           const { overlay } = this.corridorManager.addCorridor();
-          for (const [lat, lon] of vertices) {
+          // Support both new format {vertices, entry_point, exit_point} and legacy [vertices]
+          const vertices = Array.isArray(data) ? data : (data.vertices || []);
+          for (const v of vertices) {
+            const [lat, lon] = Array.isArray(v) ? v : [v.lat, v.lon];
             overlay.addVertex(lat, lon);
           }
           if (vertices.length >= 3) {
             overlay.create();
           }
+          // Get the ID of the corridor we just added (last one)
+          const allCorridors = this.corridorManager.getAllCorridors();
+          const addedId = allCorridors[allCorridors.length - 1].id;
+          // Set entry/exit if provided (new format)
+          if (!Array.isArray(data)) {
+            if (data.entry_point && data.entry_point.length === 2) {
+              this.corridorManager.setCorridorEntryPoint(addedId, data.entry_point[0], data.entry_point[1]);
+            }
+            if (data.exit_point && data.exit_point.length === 2) {
+              this.corridorManager.setCorridorExitPoint(addedId, data.exit_point[0], data.exit_point[1]);
+            }
+          }
         }
+        this.ui._updateCorridorSelect();
+        this.ui._renderCorridorList();
+        this.ui._renderCorridorEntryExitDisplay();
         console.log(`Nav corridors set: ${Object.keys(corridors).join(', ')}`);
         break;
       }
