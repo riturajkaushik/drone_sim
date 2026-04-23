@@ -10,9 +10,9 @@ class DroneWSHandler:
         self.sim_state_connections: list[WebSocket] = []
         self.drones: dict[str, DroneState] = {}
         self.surveillance_polygon: list[list[float]] | None = None
+        self.surveillance_entry_point: list[float] | None = None
+        self.surveillance_exit_point: list[float] | None = None
         self.nav_corridors: dict[str, dict] | None = None
-        self.entry_point: list[float] | None = None
-        self.exit_point: list[float] | None = None
         self._next_id = 1
 
     def _generate_drone_id(self) -> str:
@@ -75,9 +75,9 @@ class DroneWSHandler:
         drone_count = len(self.drones)
         self.drones.clear()
         self.surveillance_polygon = None
+        self.surveillance_entry_point = None
+        self.surveillance_exit_point = None
         self.nav_corridors = None
-        self.entry_point = None
-        self.exit_point = None
         self._next_id = 1
 
         # Tell all frontends to reset
@@ -274,9 +274,9 @@ class DroneWSHandler:
             "type": "sim_state",
             "drones": drones,
             "surveillance_polygon": self.surveillance_polygon,
+            "surveillance_entry_point": self.surveillance_entry_point,
+            "surveillance_exit_point": self.surveillance_exit_point,
             "nav_corridors": self.nav_corridors,
-            "entry_point": self.entry_point,
-            "exit_point": self.exit_point,
         }
 
     async def broadcast_sim_state(self):

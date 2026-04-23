@@ -18,6 +18,8 @@ function buildConfigJSON(manager, polygonOverlay, corridorManager, entryExitMark
       y: manager._captureHeightMeters,
     },
     surveillance: [],
+    surveillanceEntryPoint: null,
+    surveillanceExitPoint: null,
     navCorridors: [],
   };
 
@@ -25,6 +27,12 @@ function buildConfigJSON(manager, polygonOverlay, corridorManager, entryExitMark
   const polyVerts = polygonOverlay.getVertices();
   if (polyVerts.length > 0) {
     config.surveillance = polyVerts;
+  }
+
+  // Surveillance entry/exit points
+  if (entryExitMarkers) {
+    config.surveillanceEntryPoint = entryExitMarkers.getEntryPoint();
+    config.surveillanceExitPoint = entryExitMarkers.getExitPoint();
   }
 
   // Nav corridors
@@ -36,15 +44,6 @@ function buildConfigJSON(manager, polygonOverlay, corridorManager, entryExitMark
       entryPoint: c.entryPoint ? { ...c.entryPoint } : null,
       exitPoint: c.exitPoint ? { ...c.exitPoint } : null,
     });
-  }
-
-  // Entry/exit points
-  if (entryExitMarkers) {
-    const entry = entryExitMarkers.getEntryPoint();
-    const exit = entryExitMarkers.getExitPoint();
-    if (entry || exit) {
-      config.entryExitPoints = { entry, exit };
-    }
   }
 
   return config;

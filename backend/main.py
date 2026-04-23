@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 import asyncio
 import json
 from ws_handler import DroneWSHandler
-from drone_state import SurveillancePolygonRequest, NavCorridorsRequest, NavCorridorData, SpawnDronesRequest, FollowWaypointsRequest, EntryExitPointsRequest
+from drone_state import SurveillancePolygonRequest, NavCorridorsRequest, NavCorridorData, SpawnDronesRequest, FollowWaypointsRequest
 
 app = FastAPI(title="Drone Simulation Backend")
 
@@ -36,16 +36,22 @@ async def drone_websocket(websocket: WebSocket):
 
 @app.post("/surveillance-polygon")
 async def set_surveillance_polygon(req: SurveillancePolygonRequest):
-    """Store a surveillance area polygon and broadcast it to all connected frontends."""
+    """Store a surveillance area polygon (with optional entry/exit points) and broadcast."""
     handler.surveillance_polygon = req.surveillance_polygon
+    handler.surveillance_entry_point = req.entry_point
+    handler.surveillance_exit_point = req.exit_point
     await handler.send_to_all({
         "type": "set_surveillance_polygon",
         "surveillance_polygon": req.surveillance_polygon,
+        "entry_point": req.entry_point,
+        "exit_point": req.exit_point,
     })
     return {
         "status": "ok",
         "vertices": len(req.surveillance_polygon),
         "surveillance_polygon": req.surveillance_polygon,
+        "entry_point": req.entry_point,
+        "exit_point": req.exit_point,
     }
 
 
@@ -95,23 +101,6 @@ async def set_waypoints(req: FollowWaypointsRequest):
     return {
         "status": "ok",
         "drones": result["drones"],
-    }
-
-
-@app.post("/entry-exit-points")
-async def set_entry_exit_points(req: EntryExitPointsRequest):
-    """Store entry/exit points for the surveillance area and broadcast to all frontends."""
-    handler.entry_point = req.entry_point
-    handler.exit_point = req.exit_point
-    await handler.send_to_all({
-        "type": "set_entry_exit_points",
-        "entry_point": req.entry_point,
-        "exit_point": req.exit_point,
-    })
-    return {
-        "status": "ok",
-        "entry_point": req.entry_point,
-        "exit_point": req.exit_point,
     }
 
 

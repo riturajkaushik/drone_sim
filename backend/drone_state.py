@@ -52,8 +52,12 @@ class SpawnDronesResponse(BaseModel):
 class SurveillancePolygonRequest(BaseModel):
     """Validates the payload for the POST /surveillance-polygon endpoint.
     surveillance_polygon: [[lat, lon], [lat, lon], ...] — at least 3 vertices.
+    entry_point: optional [lat, lon] — the entry point for the surveillance area.
+    exit_point: optional [lat, lon] — the exit point for the surveillance area.
     """
     surveillance_polygon: list[list[float]]
+    entry_point: Optional[list[float]] = None
+    exit_point: Optional[list[float]] = None
 
     @field_validator("surveillance_polygon")
     @classmethod
@@ -68,6 +72,20 @@ class SurveillancePolygonRequest(BaseModel):
                 raise ValueError(f"Vertex {i}: lat {lat} out of bounds [{LAT_MIN}, {LAT_MAX}]")
             if not (LON_MIN <= lon <= LON_MAX):
                 raise ValueError(f"Vertex {i}: lon {lon} out of bounds [{LON_MIN}, {LON_MAX}]")
+        return v
+
+    @field_validator("entry_point", "exit_point")
+    @classmethod
+    def validate_point(cls, v: Optional[list[float]], info) -> Optional[list[float]]:
+        if v is None:
+            return v
+        if len(v) != 2:
+            raise ValueError(f"{info.field_name} must be [lat, lon]")
+        lat, lon = v
+        if not (LAT_MIN <= lat <= LAT_MAX):
+            raise ValueError(f"{info.field_name}: lat {lat} out of bounds [{LAT_MIN}, {LAT_MAX}]")
+        if not (LON_MIN <= lon <= LON_MAX):
+            raise ValueError(f"{info.field_name}: lon {lon} out of bounds [{LON_MIN}, {LON_MAX}]")
         return v
 
 
@@ -130,27 +148,6 @@ class NavCorridorsRequest(BaseModel):
             else:
                 raise ValueError(f"Corridor '{corridor_id}': invalid format")
         return normalized
-
-
-class EntryExitPointsRequest(BaseModel):
-    """Validates the payload for the POST /entry-exit-points endpoint.
-    entry_point: [lat, lon] — the entry point for the surveillance area.
-    exit_point: [lat, lon] — the exit point for the surveillance area.
-    """
-    entry_point: list[float]
-    exit_point: list[float]
-
-    @field_validator("entry_point", "exit_point")
-    @classmethod
-    def validate_point(cls, v: list[float], info) -> list[float]:
-        if len(v) != 2:
-            raise ValueError(f"{info.field_name} must be [lat, lon]")
-        lat, lon = v
-        if not (LAT_MIN <= lat <= LAT_MAX):
-            raise ValueError(f"{info.field_name}: lat {lat} out of bounds [{LAT_MIN}, {LAT_MAX}]")
-        if not (LON_MIN <= lon <= LON_MAX):
-            raise ValueError(f"{info.field_name}: lon {lon} out of bounds [{LON_MIN}, {LON_MAX}]")
-        return v
 
 
 class FollowWaypointsRequest(BaseModel):

@@ -137,16 +137,24 @@ async def main():
                 break
 
     # ------------------------------------------------------------------
-    # Step 2: Create the surveillance area polygon via REST
+    # Step 2: Create the surveillance area polygon with entry/exit via REST
     # ------------------------------------------------------------------
-    print("\n[Step 2] Setting surveillance polygon...")
+    print("\n[Step 2] Setting surveillance polygon with entry/exit points...")
     resp = requests.post(
         f"{REST_BASE_URL}/surveillance-polygon",
-        json={"surveillance_polygon": SURVEILLANCE_POLYGON},
+        json={
+            "surveillance_polygon": SURVEILLANCE_POLYGON,
+            "entry_point": ENTRY_POINT,
+            "exit_point": EXIT_POINT,
+        },
     )
     resp.raise_for_status()
     data = resp.json()
     print(f"  Polygon accepted — {data['vertices']} vertices")
+    if data.get("entry_point"):
+        print(f"  Entry: ({data['entry_point'][0]:.4f}, {data['entry_point'][1]:.4f})")
+    if data.get("exit_point"):
+        print(f"  Exit:  ({data['exit_point'][0]:.4f}, {data['exit_point'][1]:.4f})")
 
     # ------------------------------------------------------------------
     # Step 3: Create navigation corridors via REST
@@ -167,27 +175,11 @@ async def main():
         print(f"  {cid}: {vcount} vertices")
 
     # ------------------------------------------------------------------
-    # Step 4: Set entry and exit points via REST
-    # ------------------------------------------------------------------
-    print("\n[Step 4] Setting entry and exit points...")
-    resp = requests.post(
-        f"{REST_BASE_URL}/entry-exit-points",
-        json={
-            "entry_point": ENTRY_POINT,
-            "exit_point": EXIT_POINT,
-        },
-    )
-    resp.raise_for_status()
-    data = resp.json()
-    print(f"  Entry: ({data['entry_point'][0]:.4f}, {data['entry_point'][1]:.4f})")
-    print(f"  Exit:  ({data['exit_point'][0]:.4f}, {data['exit_point'][1]:.4f})")
-
-    # ------------------------------------------------------------------
-    # Step 5: Spawn two drones near the entry point
+    # Step 4: Spawn two drones near the entry point
     # ------------------------------------------------------------------
     drone_1_id = "alpha"
     drone_2_id = "bravo"
-    print(f"\n[Step 5] Spawning drones '{drone_1_id}' and '{drone_2_id}'...")
+    print(f"\n[Step 4] Spawning drones '{drone_1_id}' and '{drone_2_id}'...")
     resp = requests.post(
         f"{REST_BASE_URL}/spawn-drones",
         json={"drones": [
@@ -200,7 +192,7 @@ async def main():
         print(f"  Spawned {d['drone_id']} at ({d['spawn_loc'][0]:.4f}, {d['spawn_loc'][1]:.4f})")
 
     # ------------------------------------------------------------------
-    # Step 6: Build flight plans
+    # Step 5: Build flight plans
     #
     # Each drone follows:
     #   entry_point → entry corridor centerline → random patrol → exit corridor → exit_point
@@ -221,7 +213,7 @@ async def main():
     plan_1 = [ENTRY_POINT] + entry_waypoints + patrol_1 + exit_waypoints + [EXIT_POINT]
     plan_2 = [ENTRY_POINT] + entry_waypoints + patrol_2 + exit_waypoints + [EXIT_POINT]
 
-    print(f"\n[Step 6] Flight plans:")
+    print(f"\n[Step 5] Flight plans:")
     print(f"  {drone_1_id}: {len(plan_1)} waypoints "
           f"(1 entry + {len(entry_waypoints)} corridor + {len(patrol_1)} patrol "
           f"+ {len(exit_waypoints)} corridor + 1 exit)")
@@ -235,9 +227,9 @@ async def main():
             print(f"    #{i:02d}: ({wp[0]:.4f}, {wp[1]:.4f})")
 
     # ------------------------------------------------------------------
-    # Step 7: Dispatch waypoints via REST
+    # Step 6: Dispatch waypoints via REST
     # ------------------------------------------------------------------
-    print(f"\n[Step 7] Dispatching waypoints...")
+    print(f"\n[Step 6] Dispatching waypoints...")
     resp = requests.post(
         f"{REST_BASE_URL}/set-waypoints",
         json={"waypoints": {
@@ -250,11 +242,11 @@ async def main():
         print(f"  {did}: {count} waypoint(s) dispatched")
 
     # ------------------------------------------------------------------
-    # Step 8: Monitor via sim-state WebSocket until both drones finish
+    # Step 7: Monitor via sim-state WebSocket until both drones finish
     # ------------------------------------------------------------------
     total_1 = len(plan_1)
     total_2 = len(plan_2)
-    print(f"\n[Step 8] Monitoring mission progress...\n")
+    print(f"\n[Step 7] Monitoring mission progress...\n")
 
     finished = set()
     async with websockets.connect(SIM_STATE_URL) as ws:

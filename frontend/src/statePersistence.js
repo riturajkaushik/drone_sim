@@ -33,12 +33,10 @@ export function saveState(manager, ui, polygonOverlay, corridorManager, entryExi
     polygon: {
       vertices: polygonOverlay.getVertices(),
       created: polygonOverlay.isCreated(),
+      entryPoint: entryExitMarkers ? entryExitMarkers.getEntryPoint() : null,
+      exitPoint: entryExitMarkers ? entryExitMarkers.getExitPoint() : null,
     },
     corridors: corridorManager.getState(),
-    entryExitPoints: {
-      entry: entryExitMarkers ? entryExitMarkers.getEntryPoint() : null,
-      exit: entryExitMarkers ? entryExitMarkers.getExitPoint() : null,
-    },
   };
 
   try {
@@ -128,6 +126,31 @@ export function restoreState(manager, ui, polygonOverlay, corridorManager, entry
     }
     ui._renderPolygonPointList();
     ui._updatePolyButtons();
+
+    // Restore surveillance entry/exit points (stored with polygon)
+    if (entryExitMarkers) {
+      const entry = state.polygon.entryPoint;
+      const exit = state.polygon.exitPoint;
+      if (entry && entry.lat != null && entry.lon != null) {
+        entryExitMarkers.setEntryPoint(entry.lat, entry.lon);
+      }
+      if (exit && exit.lat != null && exit.lon != null) {
+        entryExitMarkers.setExitPoint(exit.lat, exit.lon);
+      }
+      ui._renderEntryExitDisplay();
+    }
+  }
+
+  // Backward compat: restore from old top-level entryExitPoints if polygon didn't have them
+  if (state.entryExitPoints && entryExitMarkers && !state.polygon?.entryPoint && !state.polygon?.exitPoint) {
+    const { entry, exit } = state.entryExitPoints;
+    if (entry && entry.lat != null && entry.lon != null) {
+      entryExitMarkers.setEntryPoint(entry.lat, entry.lon);
+    }
+    if (exit && exit.lat != null && exit.lon != null) {
+      entryExitMarkers.setExitPoint(exit.lat, exit.lon);
+    }
+    ui._renderEntryExitDisplay();
   }
 
   // Restore nav corridors
@@ -138,18 +161,6 @@ export function restoreState(manager, ui, polygonOverlay, corridorManager, entry
     ui._renderCorridorPointList();
     ui._updateCorridorButtons();
     ui._renderCorridorEntryExitDisplay();
-  }
-
-  // Restore entry/exit points
-  if (state.entryExitPoints && entryExitMarkers) {
-    const { entry, exit } = state.entryExitPoints;
-    if (entry && entry.lat != null && entry.lon != null) {
-      entryExitMarkers.setEntryPoint(entry.lat, entry.lon);
-    }
-    if (exit && exit.lat != null && exit.lon != null) {
-      entryExitMarkers.setExitPoint(exit.lat, exit.lon);
-    }
-    ui._renderEntryExitDisplay();
   }
 
   return true;

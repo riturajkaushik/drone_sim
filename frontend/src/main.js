@@ -136,6 +136,19 @@ function applyConfig(config, mapBlobURL, droneBlobURL) {
         ui._updatePolyButtons();
       }
 
+      // Restore surveillance entry/exit points
+      const survEntry = config.surveillanceEntryPoint
+        || (config.entryExitPoints && config.entryExitPoints.entry);  // backward compat
+      const survExit = config.surveillanceExitPoint
+        || (config.entryExitPoints && config.entryExitPoints.exit);  // backward compat
+      if (survEntry && survEntry.lat != null && survEntry.lon != null) {
+        entryExitMarkers.setEntryPoint(survEntry.lat, survEntry.lon);
+      }
+      if (survExit && survExit.lat != null && survExit.lon != null) {
+        entryExitMarkers.setExitPoint(survExit.lat, survExit.lon);
+      }
+      ui._renderEntryExitDisplay();
+
       // Restore nav corridors (restoreFromState handles entryPoint/exitPoint)
       if (config.navCorridors && config.navCorridors.length > 0) {
         corridorManager.restoreFromState({
@@ -147,18 +160,6 @@ function applyConfig(config, mapBlobURL, droneBlobURL) {
         ui._renderCorridorPointList();
         ui._updateCorridorButtons();
         ui._renderCorridorEntryExitDisplay();
-      }
-
-      // Restore entry/exit points
-      if (config.entryExitPoints) {
-        const { entry, exit } = config.entryExitPoints;
-        if (entry && entry.lat != null && entry.lon != null) {
-          entryExitMarkers.setEntryPoint(entry.lat, entry.lon);
-        }
-        if (exit && exit.lat != null && exit.lon != null) {
-          entryExitMarkers.setExitPoint(exit.lat, exit.lon);
-        }
-        ui._renderEntryExitDisplay();
       }
 
       resolve();

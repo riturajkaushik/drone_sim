@@ -92,6 +92,26 @@
         <button id="create-poly-btn" disabled>✔ Create</button>
         <button id="remove-poly-btn">✕ Remove</button>
       </div>
+      <div style="margin-top:8px">
+        <div class="input-row">
+          <label>Entry Lat <input type="number" id="entry-lat" step="0.0001" value="60.1620" /></label>
+          <label>Entry Lon <input type="number" id="entry-lon" step="0.0001" value="24.8900" /></label>
+        </div>
+        <div class="button-row">
+          <button id="set-entry-btn" style="flex:1">📍 Set Entry</button>
+          <button id="entry-pick-btn" class="pick-btn">🎯 Pick</button>
+        </div>
+        <div class="input-row" style="margin-top:6px">
+          <label>Exit Lat <input type="number" id="exit-lat" step="0.0001" value="60.1620" /></label>
+          <label>Exit Lon <input type="number" id="exit-lon" step="0.0001" value="24.8900" /></label>
+        </div>
+        <div class="button-row">
+          <button id="set-exit-btn" style="flex:1">📍 Set Exit</button>
+          <button id="exit-pick-btn" class="pick-btn">🎯 Pick</button>
+        </div>
+        <div id="entry-exit-display" class="entry-exit-info"></div>
+        <button id="clear-entry-exit-btn" class="clear-btn" style="width:100%;margin-top:6px">✕ Clear Points</button>
+      </div>
     </section>
 
     <section class="panel-section">
@@ -134,28 +154,6 @@
         <button id="clear-corridor-entry-exit-btn" class="clear-btn" style="width:100%;margin-top:6px">✕ Clear Points</button>
       </div>
       <ul id="corridor-list"></ul>
-    </section>
-
-    <section class="panel-section">
-      <h3>Entry / Exit Points</h3>
-      <div class="input-row">
-        <label>Entry Lat <input type="number" id="entry-lat" step="0.0001" value="60.1620" /></label>
-        <label>Entry Lon <input type="number" id="entry-lon" step="0.0001" value="24.8900" /></label>
-      </div>
-      <div class="button-row">
-        <button id="set-entry-btn" style="flex:1">📍 Set Entry</button>
-        <button id="entry-pick-btn" class="pick-btn">🎯 Pick</button>
-      </div>
-      <div class="input-row" style="margin-top:6px">
-        <label>Exit Lat <input type="number" id="exit-lat" step="0.0001" value="60.1620" /></label>
-        <label>Exit Lon <input type="number" id="exit-lon" step="0.0001" value="24.8900" /></label>
-      </div>
-      <div class="button-row">
-        <button id="set-exit-btn" style="flex:1">📍 Set Exit</button>
-        <button id="exit-pick-btn" class="pick-btn">🎯 Pick</button>
-      </div>
-      <div id="entry-exit-display" class="entry-exit-info"></div>
-      <button id="clear-entry-exit-btn" class="clear-btn" style="width:100%;margin-top:6px">✕ Clear Points</button>
     </section>
 
     <section class="panel-section">

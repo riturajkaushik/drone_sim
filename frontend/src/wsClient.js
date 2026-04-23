@@ -122,12 +122,23 @@ export class WSClient {
       case 'set_surveillance_polygon': {
         const polygon = message.surveillance_polygon || [];
         this.polygonOverlay.remove();
+        this.entryExitMarkers.removeAll();
         for (const [lat, lon] of polygon) {
           this.polygonOverlay.addVertex(lat, lon);
         }
         if (polygon.length >= 3) {
           this.polygonOverlay.create();
         }
+        // Set surveillance entry/exit points if provided
+        const entry = message.entry_point;
+        const exit = message.exit_point;
+        if (entry && entry.length === 2) {
+          this.entryExitMarkers.setEntryPoint(entry[0], entry[1]);
+        }
+        if (exit && exit.length === 2) {
+          this.entryExitMarkers.setExitPoint(exit[0], exit[1]);
+        }
+        this.ui._renderEntryExitDisplay();
         console.log(`Surveillance polygon set with ${polygon.length} vertices`);
         break;
       }
@@ -163,21 +174,6 @@ export class WSClient {
         this.ui._renderCorridorList();
         this.ui._renderCorridorEntryExitDisplay();
         console.log(`Nav corridors set: ${Object.keys(corridors).join(', ')}`);
-        break;
-      }
-
-      case 'set_entry_exit_points': {
-        const entry = message.entry_point;
-        const exit = message.exit_point;
-        this.entryExitMarkers.removeAll();
-        if (entry && entry.length === 2) {
-          this.entryExitMarkers.setEntryPoint(entry[0], entry[1]);
-        }
-        if (exit && exit.length === 2) {
-          this.entryExitMarkers.setExitPoint(exit[0], exit[1]);
-        }
-        this.ui._renderEntryExitDisplay();
-        console.log(`Entry/exit points set: entry=(${entry}), exit=(${exit})`);
         break;
       }
 
