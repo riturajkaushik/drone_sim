@@ -4,7 +4,7 @@ import { getMapBounds } from './coordinates.js';
 /**
  * Build the config.json object from current simulation state.
  */
-function buildConfigJSON(manager, polygonOverlay, corridorManager, mapFileName, droneFileName) {
+function buildConfigJSON(manager, polygonOverlay, corridorManager, entryExitMarkers, mapFileName, droneFileName) {
   const bounds = getMapBounds();
   const config = {
     mapFileName,
@@ -36,6 +36,15 @@ function buildConfigJSON(manager, polygonOverlay, corridorManager, mapFileName, 
     });
   }
 
+  // Entry/exit points
+  if (entryExitMarkers) {
+    const entry = entryExitMarkers.getEntryPoint();
+    const exit = entryExitMarkers.getExitPoint();
+    if (entry || exit) {
+      config.entryExitPoints = { entry, exit };
+    }
+  }
+
   return config;
 }
 
@@ -55,11 +64,11 @@ async function fetchImageBlob(url) {
  * @param {string} mapTextureURL - Current map texture URL (default or loaded)
  * @param {string} droneTextureURL - Current drone texture URL (default or loaded)
  */
-export async function exportConfig(manager, polygonOverlay, corridorManager, mapTextureURL, droneTextureURL) {
+export async function exportConfig(manager, polygonOverlay, corridorManager, entryExitMarkers, mapTextureURL, droneTextureURL) {
   const mapFileName = 'map.png';
   const droneFileName = 'drone.png';
 
-  const config = buildConfigJSON(manager, polygonOverlay, corridorManager, mapFileName, droneFileName);
+  const config = buildConfigJSON(manager, polygonOverlay, corridorManager, entryExitMarkers, mapFileName, droneFileName);
 
   // Fetch image blobs
   const [mapBlob, droneBlob] = await Promise.all([

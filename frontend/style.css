@@ -480,6 +480,33 @@ select:focus {
   white-space: nowrap;
 }
 
+/* Entry/Exit point info */
+.entry-exit-info {
+  font-size: 11px;
+  margin-top: 6px;
+  line-height: 1.6;
+}
+
+.entry-exit-info .entry-label {
+  color: #22cc44;
+  font-weight: 600;
+}
+
+.entry-exit-info .exit-label {
+  color: #ee3333;
+  font-weight: 600;
+}
+
+.clear-btn {
+  background: #555;
+  font-size: 12px;
+  padding: 5px 8px;
+}
+
+.clear-btn:hover {
+  background: #666;
+}
+
 /* Config buttons */
 #download-config-btn {
   background: #336699;

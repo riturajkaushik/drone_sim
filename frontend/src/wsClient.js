@@ -3,11 +3,12 @@
  * Gracefully degrades — frontend works without backend.
  */
 export class WSClient {
-  constructor(manager, ui, polygonOverlay, corridorManager, url = 'ws://localhost:8000/ws/drone') {
+  constructor(manager, ui, polygonOverlay, corridorManager, entryExitMarkers, url = 'ws://localhost:8000/ws/drone') {
     this.manager = manager;
     this.ui = ui;
     this.polygonOverlay = polygonOverlay;
     this.corridorManager = corridorManager;
+    this.entryExitMarkers = entryExitMarkers;
     this.url = url;
     this.ws = null;
     this.reconnectDelay = 3000;
@@ -112,6 +113,7 @@ export class WSClient {
         this.manager.removeAll();
         this.polygonOverlay.remove();
         this.corridorManager.removeAll();
+        this.entryExitMarkers.removeAll();
         this.ui.resetAll();
         console.log('Simulator reset via backend');
         break;
@@ -143,6 +145,21 @@ export class WSClient {
           }
         }
         console.log(`Nav corridors set: ${Object.keys(corridors).join(', ')}`);
+        break;
+      }
+
+      case 'set_entry_exit_points': {
+        const entry = message.entry_point;
+        const exit = message.exit_point;
+        this.entryExitMarkers.removeAll();
+        if (entry && entry.length === 2) {
+          this.entryExitMarkers.setEntryPoint(entry[0], entry[1]);
+        }
+        if (exit && exit.length === 2) {
+          this.entryExitMarkers.setExitPoint(exit[0], exit[1]);
+        }
+        this.ui._renderEntryExitDisplay();
+        console.log(`Entry/exit points set: entry=(${entry}), exit=(${exit})`);
         break;
       }
 

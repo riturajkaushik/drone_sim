@@ -105,6 +105,27 @@ class NavCorridorsRequest(BaseModel):
         return v
 
 
+class EntryExitPointsRequest(BaseModel):
+    """Validates the payload for the POST /entry-exit-points endpoint.
+    entry_point: [lat, lon] — the entry point for the surveillance area.
+    exit_point: [lat, lon] — the exit point for the surveillance area.
+    """
+    entry_point: list[float]
+    exit_point: list[float]
+
+    @field_validator("entry_point", "exit_point")
+    @classmethod
+    def validate_point(cls, v: list[float], info) -> list[float]:
+        if len(v) != 2:
+            raise ValueError(f"{info.field_name} must be [lat, lon]")
+        lat, lon = v
+        if not (LAT_MIN <= lat <= LAT_MAX):
+            raise ValueError(f"{info.field_name}: lat {lat} out of bounds [{LAT_MIN}, {LAT_MAX}]")
+        if not (LON_MIN <= lon <= LON_MAX):
+            raise ValueError(f"{info.field_name}: lon {lon} out of bounds [{LON_MIN}, {LON_MAX}]")
+        return v
+
+
 class FollowWaypointsRequest(BaseModel):
     """Validates the payload for follow_waypoints messages.
     waypoints: {drone_id: [[lat, lon], [lat, lon], ...], ...}

@@ -3,11 +3,12 @@
  * Works standalone without backend.
  */
 export class UI {
-  constructor(manager, polygonOverlay, corridorManager, mapPicker) {
+  constructor(manager, polygonOverlay, corridorManager, mapPicker, entryExitMarkers) {
     this.manager = manager;
     this.polygonOverlay = polygonOverlay;
     this.corridorManager = corridorManager;
     this.mapPicker = mapPicker;
+    this.entryExitMarkers = entryExitMarkers;
     this.waypointQueues = new Map(); // droneId → [{lat, lon}, ...]
 
     // Capture Area
@@ -67,6 +68,18 @@ export class UI {
     // Picker buttons
     this.polyPickBtn = document.getElementById('poly-pick-btn');
     this.corridorPickBtn = document.getElementById('corridor-pick-btn');
+
+    // Entry/Exit Points
+    this.entryLatInput = document.getElementById('entry-lat');
+    this.entryLonInput = document.getElementById('entry-lon');
+    this.setEntryBtn = document.getElementById('set-entry-btn');
+    this.entryPickBtn = document.getElementById('entry-pick-btn');
+    this.exitLatInput = document.getElementById('exit-lat');
+    this.exitLonInput = document.getElementById('exit-lon');
+    this.setExitBtn = document.getElementById('set-exit-btn');
+    this.exitPickBtn = document.getElementById('exit-pick-btn');
+    this.entryExitDisplay = document.getElementById('entry-exit-display');
+    this.clearEntryExitBtn = document.getElementById('clear-entry-exit-btn');
 
     // Status
     this.statusDisplay = document.getElementById('status-display');
@@ -294,6 +307,75 @@ export class UI {
         () => this._clearPickerButtonStates()
       );
     });
+
+    // Entry point: set
+    this.setEntryBtn.addEventListener('click', () => {
+      const lat = parseFloat(this.entryLatInput.value);
+      const lon = parseFloat(this.entryLonInput.value);
+      if (!isNaN(lat) && !isNaN(lon)) {
+        this.entryExitMarkers.setEntryPoint(lat, lon);
+        this._renderEntryExitDisplay();
+      }
+    });
+
+    // Exit point: set
+    this.setExitBtn.addEventListener('click', () => {
+      const lat = parseFloat(this.exitLatInput.value);
+      const lon = parseFloat(this.exitLonInput.value);
+      if (!isNaN(lat) && !isNaN(lon)) {
+        this.entryExitMarkers.setExitPoint(lat, lon);
+        this._renderEntryExitDisplay();
+      }
+    });
+
+    // Clear entry/exit points
+    this.clearEntryExitBtn.addEventListener('click', () => {
+      this.entryExitMarkers.removeAll();
+      this._renderEntryExitDisplay();
+      if (this._activePickerMode === 'entry' || this._activePickerMode === 'exit') {
+        this.mapPicker.deactivate();
+      }
+    });
+
+    // Picker: entry point
+    this.entryPickBtn.addEventListener('click', () => {
+      if (this.mapPicker.isActive() && this._activePickerMode === 'entry') {
+        this.mapPicker.deactivate();
+        return;
+      }
+      this._activePickerMode = 'entry';
+      this._setPickerButtonStates(this.entryPickBtn);
+      this.mapPicker.activate(
+        (lat, lon) => {
+          this.entryLatInput.value = lat.toFixed(4);
+          this.entryLonInput.value = lon.toFixed(4);
+          this.entryExitMarkers.setEntryPoint(lat, lon);
+          this._renderEntryExitDisplay();
+          this.mapPicker.deactivate();
+        },
+        () => this._clearPickerButtonStates()
+      );
+    });
+
+    // Picker: exit point
+    this.exitPickBtn.addEventListener('click', () => {
+      if (this.mapPicker.isActive() && this._activePickerMode === 'exit') {
+        this.mapPicker.deactivate();
+        return;
+      }
+      this._activePickerMode = 'exit';
+      this._setPickerButtonStates(this.exitPickBtn);
+      this.mapPicker.activate(
+        (lat, lon) => {
+          this.exitLatInput.value = lat.toFixed(4);
+          this.exitLonInput.value = lon.toFixed(4);
+          this.entryExitMarkers.setExitPoint(lat, lon);
+          this._renderEntryExitDisplay();
+          this.mapPicker.deactivate();
+        },
+        () => this._clearPickerButtonStates()
+      );
+    });
   }
 
   _showDroneError(message) {
@@ -415,6 +497,20 @@ export class UI {
     this._renderCorridorList();
     this._renderCorridorPointList();
     this._updateCorridorButtons();
+    this._renderEntryExitDisplay();
+  }
+
+  _renderEntryExitDisplay() {
+    const entry = this.entryExitMarkers.getEntryPoint();
+    const exit = this.entryExitMarkers.getExitPoint();
+    let html = '';
+    if (entry) {
+      html += `<div><span class="entry-label">● Entry:</span> ${entry.lat.toFixed(4)}, ${entry.lon.toFixed(4)}</div>`;
+    }
+    if (exit) {
+      html += `<div><span class="exit-label">● Exit:</span> ${exit.lat.toFixed(4)}, ${exit.lon.toFixed(4)}</div>`;
+    }
+    this.entryExitDisplay.innerHTML = html;
   }
 
   _renderPolygonPointList() {
@@ -519,12 +615,16 @@ export class UI {
   _setPickerButtonStates(activeBtn) {
     this.polyPickBtn.classList.remove('active');
     this.corridorPickBtn.classList.remove('active');
+    this.entryPickBtn.classList.remove('active');
+    this.exitPickBtn.classList.remove('active');
     activeBtn.classList.add('active');
   }
 
   _clearPickerButtonStates() {
     this.polyPickBtn.classList.remove('active');
     this.corridorPickBtn.classList.remove('active');
+    this.entryPickBtn.classList.remove('active');
+    this.exitPickBtn.classList.remove('active');
     this._activePickerMode = null;
   }
 }

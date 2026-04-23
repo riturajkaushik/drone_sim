@@ -14,7 +14,7 @@ export function clearState() {
 /**
  * Save the full application state to localStorage.
  */
-export function saveState(manager, ui, polygonOverlay, corridorManager) {
+export function saveState(manager, ui, polygonOverlay, corridorManager, entryExitMarkers) {
   const state = {
     drones: manager.getAllDrones().map(d => ({
       id: d.id,
@@ -35,6 +35,10 @@ export function saveState(manager, ui, polygonOverlay, corridorManager) {
       created: polygonOverlay.isCreated(),
     },
     corridors: corridorManager.getState(),
+    entryExitPoints: {
+      entry: entryExitMarkers ? entryExitMarkers.getEntryPoint() : null,
+      exit: entryExitMarkers ? entryExitMarkers.getExitPoint() : null,
+    },
   };
 
   try {
@@ -49,7 +53,7 @@ export function saveState(manager, ui, polygonOverlay, corridorManager) {
  * Recreates drones and applies settings.
  * @returns {boolean} true if state was restored
  */
-export function restoreState(manager, ui, polygonOverlay, corridorManager) {
+export function restoreState(manager, ui, polygonOverlay, corridorManager, entryExitMarkers) {
   let raw;
   try {
     raw = localStorage.getItem(STORAGE_KEY);
@@ -133,6 +137,18 @@ export function restoreState(manager, ui, polygonOverlay, corridorManager) {
     ui._renderCorridorList();
     ui._renderCorridorPointList();
     ui._updateCorridorButtons();
+  }
+
+  // Restore entry/exit points
+  if (state.entryExitPoints && entryExitMarkers) {
+    const { entry, exit } = state.entryExitPoints;
+    if (entry && entry.lat != null && entry.lon != null) {
+      entryExitMarkers.setEntryPoint(entry.lat, entry.lon);
+    }
+    if (exit && exit.lat != null && exit.lon != null) {
+      entryExitMarkers.setExitPoint(exit.lat, exit.lon);
+    }
+    ui._renderEntryExitDisplay();
   }
 
   return true;

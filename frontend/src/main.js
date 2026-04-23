@@ -7,6 +7,7 @@ import { UI } from './ui.js';
 import { WSClient } from './wsClient.js';
 import { MAP_WIDTH, MAP_HEIGHT, updateMapConfig, resetMapConfig } from './coordinates.js';
 import { MapPicker } from './mapPicker.js';
+import { EntryExitMarkers } from './entryExitMarkers.js';
 import { saveState, restoreState, clearState } from './statePersistence.js';
 import { setDefaultDroneTexture, getDefaultDroneTexture } from './drone.js';
 import { exportConfig, importConfig } from './configIO.js';
@@ -44,13 +45,14 @@ createMapPlane(scene);
 const manager = new DroneManager(scene);
 const polygonOverlay = new PolygonOverlay(scene);
 const corridorManager = new NavCorridorManager(scene);
+const entryExitMarkers = new EntryExitMarkers(scene);
 const mapPicker = new MapPicker(camera, renderer.domElement);
 
 // UI
-const ui = new UI(manager, polygonOverlay, corridorManager, mapPicker);
+const ui = new UI(manager, polygonOverlay, corridorManager, mapPicker, entryExitMarkers);
 
 // WebSocket client (connects in background, frontend works without it)
-const wsClient = new WSClient(manager, ui, polygonOverlay, corridorManager);
+const wsClient = new WSClient(manager, ui, polygonOverlay, corridorManager, entryExitMarkers);
 wsClient.connect();
 
 /**
@@ -94,6 +96,7 @@ function applyConfig(config, mapBlobURL, droneBlobURL) {
   manager.removeAll();
   polygonOverlay.remove();
   corridorManager.removeAll();
+  entryExitMarkers.removeAll();
   ui.resetAll();
   clearState();
 
@@ -145,6 +148,18 @@ function applyConfig(config, mapBlobURL, droneBlobURL) {
         ui._updateCorridorButtons();
       }
 
+      // Restore entry/exit points
+      if (config.entryExitPoints) {
+        const { entry, exit } = config.entryExitPoints;
+        if (entry && entry.lat != null && entry.lon != null) {
+          entryExitMarkers.setEntryPoint(entry.lat, entry.lon);
+        }
+        if (exit && exit.lat != null && exit.lon != null) {
+          entryExitMarkers.setExitPoint(exit.lat, exit.lon);
+        }
+        ui._renderEntryExitDisplay();
+      }
+
       resolve();
     };
     img.onerror = () => {
@@ -159,7 +174,7 @@ function applyConfig(config, mapBlobURL, droneBlobURL) {
 
 document.getElementById('download-config-btn').addEventListener('click', async () => {
   try {
-    await exportConfig(manager, polygonOverlay, corridorManager, _currentMapURL, _currentDroneURL);
+    await exportConfig(manager, polygonOverlay, corridorManager, entryExitMarkers, _currentMapURL, _currentDroneURL);
   } catch (err) {
     console.error('Failed to export config:', err);
     alert('Failed to export configuration: ' + err.message);
@@ -201,7 +216,7 @@ document.getElementById('config-file-input').addEventListener('change', async (e
   }
 
   // Fall back to localStorage state restore
-  restoreState(manager, ui, polygonOverlay, corridorManager);
+  restoreState(manager, ui, polygonOverlay, corridorManager, entryExitMarkers);
 })();
 
 // Reset Simulator button
@@ -212,6 +227,7 @@ document.getElementById('reset-sim-btn').addEventListener('click', async () => {
   manager.removeAll();
   polygonOverlay.remove();
   corridorManager.removeAll();
+  entryExitMarkers.removeAll();
   ui.resetAll();
   clearState();
 
@@ -239,10 +255,10 @@ function scheduleSave() {
   if (_saveTimer) return;
   _saveTimer = setTimeout(() => {
     _saveTimer = null;
-    saveState(manager, ui, polygonOverlay, corridorManager);
+    saveState(manager, ui, polygonOverlay, corridorManager, entryExitMarkers);
   }, 1000);
 }
-window.addEventListener('beforeunload', () => saveState(manager, ui, polygonOverlay, corridorManager));
+window.addEventListener('beforeunload', () => saveState(manager, ui, polygonOverlay, corridorManager, entryExitMarkers));
 
 // Animation loop
 const clock = new THREE.Clock();

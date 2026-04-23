@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 import asyncio
 import json
 from ws_handler import DroneWSHandler
-from drone_state import SurveillancePolygonRequest, NavCorridorsRequest, SpawnDronesRequest, FollowWaypointsRequest
+from drone_state import SurveillancePolygonRequest, NavCorridorsRequest, SpawnDronesRequest, FollowWaypointsRequest, EntryExitPointsRequest
 
 app = FastAPI(title="Drone Simulation Backend")
 
@@ -91,6 +91,23 @@ async def set_waypoints(req: FollowWaypointsRequest):
     return {
         "status": "ok",
         "drones": result["drones"],
+    }
+
+
+@app.post("/entry-exit-points")
+async def set_entry_exit_points(req: EntryExitPointsRequest):
+    """Store entry/exit points for the surveillance area and broadcast to all frontends."""
+    handler.entry_point = req.entry_point
+    handler.exit_point = req.exit_point
+    await handler.send_to_all({
+        "type": "set_entry_exit_points",
+        "entry_point": req.entry_point,
+        "exit_point": req.exit_point,
+    })
+    return {
+        "status": "ok",
+        "entry_point": req.entry_point,
+        "exit_point": req.exit_point,
     }
 
 
