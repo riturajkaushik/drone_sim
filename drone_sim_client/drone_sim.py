@@ -99,11 +99,15 @@ class drone_sim:
 
         # mission.render()
 
-        waypoints = {
-            "drone-1": approach_path + surveillance_path + exit_path
-        }
+
+
+        combined_path = [[p["lat"], p["lon"]] for p in approach_path] + [[p["lat"], p["lon"]] for p in surveillance_path] + [[p["lat"], p["lon"]] for p in exit_path]
         
-        print("Waypoints planned: ", waypoints)
+        waypoints = {
+            "drone-1": combined_path,
+        }
+
+
         # Spawn a drone and set its waypoints
         DRONES_TO_SPAWN = [
             {"spawn_loc": [approach_path[0]["lat"], approach_path[0]["lon"]], "drone_id": "drone-1"},
@@ -114,11 +118,15 @@ class drone_sim:
             json={"drones": DRONES_TO_SPAWN},
         )
 
+        print(resp.json())
+
         # Set waypoints via REST API
         resp = requests.post(
             f"{self.backend_url}/set-waypoints",
             json={"waypoints": waypoints},
         )
+
+        print(resp.json())
 
 
 if __name__ == "__main__":
