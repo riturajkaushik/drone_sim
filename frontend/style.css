@@ -480,6 +480,23 @@ select:focus {
   white-space: nowrap;
 }
 
+/* Config buttons */
+#download-config-btn {
+  background: #336699;
+}
+
+#download-config-btn:hover {
+  background: #2a5580;
+}
+
+#load-config-btn {
+  background: #555;
+}
+
+#load-config-btn:hover {
+  background: #666;
+}
+
 .pick-btn:hover {
   background: #666;
 }

@@ -10,6 +10,23 @@ const DRONE_COLORS = [
 ];
 let colorIndex = 0;
 
+// Configurable default drone texture URL
+let _defaultDroneTextureURL = '/drone.png';
+
+/**
+ * Set the default texture URL used for newly created drones.
+ */
+export function setDefaultDroneTexture(url) {
+  _defaultDroneTextureURL = url;
+}
+
+/**
+ * Get the current default drone texture URL.
+ */
+export function getDefaultDroneTexture() {
+  return _defaultDroneTextureURL;
+}
+
 export class Drone {
   constructor(scene, id, lat = 60.1620, lon = 24.8900) {
     this.id = id;
@@ -28,7 +45,7 @@ export class Drone {
 
     // Create drone sprite
     const loader = new THREE.TextureLoader();
-    const texture = loader.load('/drone.png');
+    const texture = loader.load(_defaultDroneTextureURL);
     texture.colorSpace = THREE.SRGBColorSpace;
 
     const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
