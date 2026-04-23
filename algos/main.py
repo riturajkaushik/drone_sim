@@ -1,9 +1,9 @@
-from space_partition import SpacePolygon
+from surveillance_polygon import SurveillancePolygon
 
 
 def main():
     # 5-point polygon around Lauttasaari, Helsinki
-    polygon = SpacePolygon(
+    polygon = SurveillancePolygon(
         [
             {"lat": 60.1600, "lon": 24.8700},
             {"lat": 60.1650, "lon": 24.8900},
