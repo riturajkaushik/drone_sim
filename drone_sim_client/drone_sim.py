@@ -48,7 +48,7 @@ class drone_sim:
 
         # # Partition and plan the surveillance route
         mission.partition_surveillance(length_x=100, length_y=100, overlap_percentage=20)
-        mission.plan_surveillance_route()
+        surveillance_path = mission.plan_surveillance_route()
 
         corridors = self.sim_config.get("navCorridors", [])
         approach_corridor = None
@@ -77,7 +77,7 @@ class drone_sim:
         BORDER_DISTANCE = 50.0   # min distance from polygon edges in meters
         MIN_PATH_POINTS = 10     # minimum waypoints in the path for smoothness
 
-        mission.plan_nav_path(
+        approach_path = mission.plan_nav_path(
             "approach",
             num_samples=NUM_SAMPLES,
             border_distance=BORDER_DISTANCE,
@@ -90,14 +90,30 @@ class drone_sim:
                 entry_point=exit_corridor.get("entryPoint"),
                 exit_point=exit_corridor.get("exitPoint"),
             )
-        mission.plan_nav_path(
+        exit_path = mission.plan_nav_path(
             "exit",
             num_samples=NUM_SAMPLES,
             border_distance=BORDER_DISTANCE,
             min_path_points=MIN_PATH_POINTS,
         )
 
-        mission.render()
+        # mission.render()
+
+        waypoints = {
+            "drone-1": approach_path + surveillance_path + exit_path
+        }
+        
+        print(approach_path[0])
+        # Spawn a drone and set its waypoints
+        DRONES_TO_SPAWN = [
+            {"spawn_loc": [approach_path[0]["lat"], approach_path[0]["lon"]], "drone_id": "alpha"},
+        ]
+
+        resp = requests.post(
+            f"{self.backend_url}/spawn-drones",
+            json={"drones": DRONES_TO_SPAWN},
+        )
+
 
 if __name__ == "__main__":
     sim = drone_sim()
