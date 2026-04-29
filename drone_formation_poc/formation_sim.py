@@ -159,8 +159,12 @@ def interpolate_waypoints(waypoints, smoothness=1):
 
 waypoints = [Position(0, 0, 0), Position(5, 8, 0), Position(10, 6, 0), Position(15, 10, 0), Position(20, 0, 0)]
 
-
 interpolated_path = interpolate_waypoints(waypoints)
+
+formation = Formation("V-Formation")
+formation.add("drone1", Position(0, 0, 0), Q(1, 0, 0, 0))
+formation.add("drone2", Position(-1, -1, 0), Q(1, 0, 0, 0))
+formation.add("drone3", Position(1, -1, 0), Q(1, 0, 0, 0))
 
 # Plotting the waypoints and interpolated path
 import matplotlib.pyplot as plt
@@ -176,4 +180,6 @@ plt.xlabel('X')
 plt.ylabel('Y')
 plt.legend()
 plt.grid()
-plt.show()
+plt.pause(0.001)
+
+# Plot the 
