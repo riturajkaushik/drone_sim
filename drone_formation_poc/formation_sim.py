@@ -3,6 +3,7 @@ import math
 import numpy as np
 from pytransform3d.transformations import transform_from
 from pytransform3d.rotations import matrix_from_quaternion
+import matplotlib.pyplot as plt
 
 class Velocity:
     def __init__(self, x, y, z=0):
@@ -66,10 +67,10 @@ class Drone:
         self.target_velocity = velocity
         self.target_orientation = orientation
 
-    def target_velocity(self, new_velocity: Velocity):
+    def set_target_velocity(self, new_velocity: Velocity):
         self.target_velocity = new_velocity
     
-    def target_orientation(self, new_orientation: Q):
+    def set_target_orientation(self, new_orientation: Q):
         self.target_orientation = new_orientation
 
     def step(self, dt):
@@ -158,57 +159,96 @@ def interpolate_waypoints(waypoints, smoothness=1):
             ))
     return interpolated_path
 
-waypoints = [Position(0, 0, 0), Position(5, 8, 0), Position(10, 6, 0), Position(15, 10, 0), Position(20, 0, 0)]
 
-interpolated_path = interpolate_waypoints(waypoints)
+class Simulation:
+    def __init__(self, formation: Formation, waypoints):
+        self.formation = formation
+        self.waypoints = waypoints
+        self.drones = {drone_id: Drone(drone_id, Position(0, 0, 0)) for drone_id in formation.positions.keys()}
+        self.current_waypoint_index = 0
+        self.interpolated_path = interpolate_waypoints(waypoints)
+        # plt.figure(figsize=(15, 15))
+        plt.xlim(-15, 15)
+        plt.ylim(-15, 15)
 
-formation = Formation("V-Formation")
-formation.add("drone1", Position(0, 1, 0), Q(1, 0, 0, 0))
-formation.add("drone2", Position(-1, 0, 0), Q(1, 0, 0, 0))
-formation.add("drone3", Position(1, 0, 0), Q(1, 0, 0, 0))
-formation.add("drone4", Position(-2, -1, 0), Q(1, 0, 0, 0))
-formation.add("drone5", Position(2, -1, 0), Q(1, 0, 0, 0))
+    def step(self, dt):
+        if self.current_waypoint_index < len(self.interpolated_path) - 1:
+            current_wp = self.interpolated_path[self.current_waypoint_index]
+            next_wp = self.interpolated_path[self.current_waypoint_index + 1]
+            targets = waypoint_formation(current_wp, next_wp, self.formation)
 
-# Plotting the waypoints and interpolated path
-import matplotlib.pyplot as plt
-waypoint_x = [wp.x for wp in waypoints]
-waypoint_y = [wp.y for wp in waypoints]
-interpolated_x = [wp.x for wp in interpolated_path]
-interpolated_y = [wp.y for wp in interpolated_path] 
-plt.figure(figsize=(10, 6))
-plt.plot(waypoint_x, waypoint_y, 'ro-', label='Waypoints')
-plt.plot(interpolated_x, interpolated_y, 'bx-', label='Interpolated Path')
-plt.title('Waypoints and Interpolated Path')
-plt.xlabel('X')
-plt.ylabel('Y')
-plt.legend()
-plt.grid()
+            for drone_id, target in targets.items():
+                drone = self.drones[drone_id]
+                drone.set_target_velocity(Velocity(target["position"].x - drone.position.x,
+                                              target["position"].y - drone.position.y))
+                drone.set_target_orientation(target["orientation"])
 
-# Plot the formation at the first waypoint
-targets = waypoint_formation(interpolated_path[20], interpolated_path[21], formation)
-drone_x = []
-drone_y = []
-drone_u = []  # x-component of arrow direction
-drone_v = []  # y-component of arrow direction
+            # Check if we are close enough to the next waypoint to move on
+            if np.linalg.norm([next_wp.x - current_wp.x, next_wp.y - current_wp.y]) < 0.5:
+                self.current_waypoint_index += 1
 
-for drone_id, target in targets.items():
-    pos = target["position"]
-    ori = target["orientation"]
+        # Update all drones
+        for drone in self.drones.values():
+            drone.step(dt)
+        
+        self.plot()
     
-    # Calculate the y-axis direction in the drone's local frame
-    # Rotate the unit y-vector [0, 1, 0] by the drone's orientation
-    rot_matrix = matrix_from_quaternion([ori.w, ori.x, ori.y, ori.z])[:3, :3]
-    y_axis = np.dot(rot_matrix, np.array([0, 1, 0]))
-    
-    drone_x.append(pos.x)
-    drone_y.append(pos.y)
-    drone_u.append(y_axis[0])
-    drone_v.append(y_axis[1])
+    def plot(self):
+        # Visualize the drones and the waypoints using matplotlib
+        plt.clf()  # Clear the current figure
+        waypoint_x = [wp.x for wp in self.waypoints]
+        waypoint_y = [wp.y for wp in self.waypoints]
+        interpolated_x = [wp.x for wp in self.interpolated_path]
+        interpolated_y = [wp.y for wp in self.interpolated_path] 
+        plt.plot(waypoint_x, waypoint_y, 'ro-', label='Waypoints')
+        plt.plot(interpolated_x, interpolated_y, 'bx-', label='Interpolated Path')
+        plt.title('Waypoints and Interpolated Path')
+        plt.xlabel('X')
+        plt.ylabel('Y')
+        plt.legend()
+        plt.grid()
 
-plt.quiver(drone_x, drone_y, drone_u, drone_v, color='green', scale=30, width=0.003, label='Drones')
-plt.title('Formation Targets at First Waypoint')
-plt.xlabel('X')
-plt.ylabel('Y')
-plt.legend()
-plt.grid()
-plt.show()
+        # Plot the actual drone positions
+        drone_x = []
+        drone_y = []
+        drone_u = []  # x-component of arrow direction
+        drone_v = []  # y-component of arrow direction
+
+        for drone_id, drone in self.drones.items():
+            pos = drone.position
+            ori = drone.orientation
+            
+            # Calculate the y-axis direction in the drone's local frame
+            # Rotate the unit y-vector [0, 1, 0] by the drone's orientation
+            rot_matrix = matrix_from_quaternion([ori.w, ori.x, ori.y, ori.z])[:3, :3]
+            y_axis = np.dot(rot_matrix, np.array([0, 1, 0]))
+            
+            drone_x.append(pos.x)
+            drone_y.append(pos.y)
+            drone_u.append(y_axis[0])
+            drone_v.append(y_axis[1])
+
+        plt.quiver(drone_x, drone_y, drone_u, drone_v, color='green', scale=30, width=0.003, label='Drones')
+        # plt.title('Formation Targets at First Waypoint')
+        # plt.xlabel('X')
+        # plt.ylabel('Y')
+        # plt.legend()
+        # plt.grid()
+        plt.pause(0.01)  # Pause to update the plot
+
+
+if __name__ == "__main__":
+    waypoints = [Position(0, 0, 0), Position(5, 8, 0), Position(10, 6, 0), Position(15, 10, 0), Position(20, 0, 0)]
+
+
+    formation = Formation("V-Formation")
+    formation.add("drone1", Position(0, 1, 0), Q(1, 0, 0, 0))
+    formation.add("drone2", Position(-1, 0, 0), Q(1, 0, 0, 0))
+    formation.add("drone3", Position(1, 0, 0), Q(1, 0, 0, 0))
+    formation.add("drone4", Position(-2, -1, 0), Q(1, 0, 0, 0))
+    formation.add("drone5", Position(2, -1, 0), Q(1, 0, 0, 0))
+
+    sim = Simulation(formation, waypoints)
+    for _ in range(200):
+        sim.step(0.5)
+        input()
