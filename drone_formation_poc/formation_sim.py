@@ -107,13 +107,14 @@ def waypoint_formation(current_waypoint, next_waypoint, formation):
         A dictionary mapping each drone ID to its target global position and orientation.
     """
     # Calculate the direction vector from current to next waypoint
-    direction = np.array([next_waypoint.x - current_waypoint.x, next_waypoint.y - current_waypoint.y])
+    direction = np.array([next_waypoint.x - current_waypoint.x, next_waypoint.y - current_waypoint.y], dtype=float)
     distance = np.linalg.norm(direction)
     if distance > 0:
         direction /= distance  # Normalize the direction vector
 
     # Calculate the angle of the formation based on the direction
-    angle = math.atan2(direction[1], direction[0])
+    # Subtract π/2 so that the formation's y-axis aligns with the waypoint direction
+    angle = math.atan2(direction[1], direction[0]) - math.pi / 2
     formation_orientation = q_from_axis_angle(np.array([0, 0, 1]), angle)
 
     targets = {}
@@ -162,9 +163,11 @@ waypoints = [Position(0, 0, 0), Position(5, 8, 0), Position(10, 6, 0), Position(
 interpolated_path = interpolate_waypoints(waypoints)
 
 formation = Formation("V-Formation")
-formation.add("drone1", Position(0, 0, 0), Q(1, 0, 0, 0))
-formation.add("drone2", Position(-1, -1, 0), Q(1, 0, 0, 0))
-formation.add("drone3", Position(1, -1, 0), Q(1, 0, 0, 0))
+formation.add("drone1", Position(0, 1, 0), Q(1, 0, 0, 0))
+formation.add("drone2", Position(-1, 0, 0), Q(1, 0, 0, 0))
+formation.add("drone3", Position(1, 0, 0), Q(1, 0, 0, 0))
+formation.add("drone4", Position(-2, -1, 0), Q(1, 0, 0, 0))
+formation.add("drone5", Position(2, -1, 0), Q(1, 0, 0, 0))
 
 # Plotting the waypoints and interpolated path
 import matplotlib.pyplot as plt
@@ -180,6 +183,14 @@ plt.xlabel('X')
 plt.ylabel('Y')
 plt.legend()
 plt.grid()
-plt.pause(0.001)
 
-# Plot the 
+# Plot the formation at the first waypoint
+targets = waypoint_formation(interpolated_path[20], interpolated_path[21], formation)
+for drone_id, target in targets.items():
+    plt.plot(target["position"].x, target["position"].y, 'go', label=f'{drone_id} Target')
+plt.title('Formation Targets at First Waypoint')
+plt.xlabel('X')
+plt.ylabel('Y')
+plt.legend()
+plt.grid()
+plt.show()
