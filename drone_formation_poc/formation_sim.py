@@ -186,8 +186,26 @@ plt.grid()
 
 # Plot the formation at the first waypoint
 targets = waypoint_formation(interpolated_path[20], interpolated_path[21], formation)
+drone_x = []
+drone_y = []
+drone_u = []  # x-component of arrow direction
+drone_v = []  # y-component of arrow direction
+
 for drone_id, target in targets.items():
-    plt.plot(target["position"].x, target["position"].y, 'go', label=f'{drone_id} Target')
+    pos = target["position"]
+    ori = target["orientation"]
+    
+    # Calculate the y-axis direction in the drone's local frame
+    # Rotate the unit y-vector [0, 1, 0] by the drone's orientation
+    rot_matrix = matrix_from_quaternion([ori.w, ori.x, ori.y, ori.z])[:3, :3]
+    y_axis = np.dot(rot_matrix, np.array([0, 1, 0]))
+    
+    drone_x.append(pos.x)
+    drone_y.append(pos.y)
+    drone_u.append(y_axis[0])
+    drone_v.append(y_axis[1])
+
+plt.quiver(drone_x, drone_y, drone_u, drone_v, color='green', scale=30, width=0.003, label='Drones')
 plt.title('Formation Targets at First Waypoint')
 plt.xlabel('X')
 plt.ylabel('Y')
