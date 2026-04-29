@@ -2,7 +2,7 @@
 import math
 import numpy as np
 from pytransform3d.transformations import transform_from
-from pytransform3d.rotations import quaternion_matrix
+from pytransform3d.rotations import matrix_from_quaternion
 
 class Velocity:
     def __init__(self, x, y, z=0):
@@ -87,7 +87,7 @@ class Drone:
 
 
 class Formation:
-    def __init__(self, formation_id: str, frame_postion: Position = Position(0,0), frame_orientation: Q = Q(1,0,0,0)):
+    def __init__(self, formation_id: str, frame_postion: Position = Position(0,0, 0), frame_orientation: Q = Q(1,0,0,0)):
         self.formation_id = formation_id
         self.frame_position = frame_postion
         self.frame_orientation = frame_orientation
@@ -122,7 +122,7 @@ def waypoint_formation(current_waypoint, next_waypoint, formation):
         local_ori = info["orientation"]
 
         # Rotate local position by formation orientation
-        rot_matrix = quaternion_matrix([formation_orientation.w, formation_orientation.x, formation_orientation.y, formation_orientation.z])[:3, :3]
+        rot_matrix = matrix_from_quaternion([formation_orientation.w, formation_orientation.x, formation_orientation.y, formation_orientation.z])[:3, :3]
         global_pos = np.dot(rot_matrix, np.array([local_pos.x, local_pos.y, local_pos.z])) + np.array([current_waypoint.x, current_waypoint.y, current_waypoint.z])
 
         # Combine orientations (for simplicity, we just use the formation orientation)
@@ -132,7 +132,7 @@ def waypoint_formation(current_waypoint, next_waypoint, formation):
 
     return targets
 
-def interpolate_waypoints(waypoints):
+def interpolate_waypoints(waypoints, smoothness=1):
     """Interpolate between waypoints to create a smooth path for the formation.
     
     Args:
@@ -147,7 +147,7 @@ def interpolate_waypoints(waypoints):
     for i in range(1, len(waypoints)):
         start = waypoints[i - 1]
         end = waypoints[i]
-        steps = int(np.linalg.norm([end.x - start.x, end.y - start.y]) * 10)  # Adjust the multiplier for smoothness
+        steps = int(np.linalg.norm([end.x - start.x, end.y - start.y]) * smoothness)  # Adjust the multiplier for smoothness
         for j in range(1, steps + 1):
             t = j / steps
             interpolated_path.append(Position(
@@ -157,7 +157,7 @@ def interpolate_waypoints(waypoints):
             ))
     return interpolated_path
 
-waypoints = [Position(0, 0), Position(5, 8), Position(10, 6), Position(15, 10), Position(20, 0)]
+waypoints = [Position(0, 0, 0), Position(5, 8, 0), Position(10, 6, 0), Position(15, 10, 0), Position(20, 0, 0)]
 
 
 interpolated_path = interpolate_waypoints(waypoints)
@@ -175,3 +175,5 @@ plt.title('Waypoints and Interpolated Path')
 plt.xlabel('X')
 plt.ylabel('Y')
 plt.legend()
+plt.grid()
+plt.show()
