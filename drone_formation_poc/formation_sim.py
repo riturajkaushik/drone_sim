@@ -182,6 +182,7 @@ class Simulation:
                 drone.set_target_velocity(Velocity(target["position"].x - drone.position.x,
                                               target["position"].y - drone.position.y))
                 drone.set_target_orientation(target["orientation"])
+                print(f"Drone {drone_id} target position: ({target['position'].x:.2f}, {target['position'].y:.2f})")
 
             # Check if we are close enough to the next waypoint to move on
             if np.linalg.norm([next_wp.x - current_wp.x, next_wp.y - current_wp.y]) < 0.5:
